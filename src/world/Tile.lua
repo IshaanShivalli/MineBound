@@ -30,7 +30,7 @@ function Tile:init(gridX, gridY, tileType, dimension)
     self.health = self.maxHealth
     self.shootTimer = 0
     self.shootInterval = 1.2
-    self.range = 100
+    self.range = 160
     self.healTimer = 0
     self.healInterval = 0.5
 end
@@ -175,6 +175,14 @@ function Tile:fireTurret(playState)
         end
     end
 
+    -- If player turret and no minion, target enemy hero if in same dimension
+    if not target and isPlayerTurret and playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == self.dimension then
+        local d = Distance(cx, cy, playState.enemyHero.x + playState.enemyHero.width / 2, playState.enemyHero.y + playState.enemyHero.height / 2)
+        if d < closestDist then
+            target = playState.enemyHero
+        end
+    end
+
     if target then
         -- Play sound only if player is in the same realm
         if playState.hero.dimension == self.dimension then
@@ -195,12 +203,12 @@ function Tile:pulseAnchor(playState)
     local cy = (self.gridY - 0.5) * 32
     local isPlayerAnchor = (self.type == Tile.NETHER_ANCHOR_PLAYER)
 
-    -- Anchor periodically attacks enemy units in Nether or pulses energy
+    -- Anchor periodically attacks enemy units across the Nether (large range -- anchors are major structures)
     for _, minion in ipairs(playState.minions) do
         if minion:isAlive() and minion.dimension == 'nether' and
            ((isPlayerAnchor and minion.owner == 'enemy') or (not isPlayerAnchor and minion.owner == 'player')) then
             local d = Distance(cx, cy, minion.x + minion.size / 2, minion.y + minion.size / 2)
-            if d < 120 then
+            if d < 300 then
                 playState:addLaser(cx, cy, minion.x + 8, minion.y + 8, isPlayerAnchor and {0.4, 0.8, 1} or {1, 0.3, 0.7}, 'nether')
                 minion:takeDamage(20)
                 playState:addSparks(minion.x + 8, minion.y + 8, {0.9, 0.3, 1}, 'nether')
@@ -208,12 +216,23 @@ function Tile:pulseAnchor(playState)
         end
     end
 
+    -- Enemy anchor targets player hero across most of the Nether
     if not isPlayerAnchor and playState.hero:isAlive() and playState.hero.dimension == 'nether' then
         local d = Distance(cx, cy, playState.hero.x + playState.hero.width / 2, playState.hero.y + playState.hero.height / 2)
-        if d < 100 then
+        if d < 500 then
             playState:addLaser(cx, cy, playState.hero.x + 12, playState.hero.y + 12, {1, 0.2, 0.6}, 'nether')
             playState.hero:takeDamage(12)
             playState:addSparks(playState.hero.x + 12, playState.hero.y + 12, {1, 0.2, 0.8}, 'nether')
+        end
+    end
+
+    -- Player anchor targets enemy hero across most of the Nether
+    if isPlayerAnchor and playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == 'nether' then
+        local d = Distance(cx, cy, playState.enemyHero.x + playState.enemyHero.width / 2, playState.enemyHero.y + playState.enemyHero.height / 2)
+        if d < 500 then
+            playState:addLaser(cx, cy, playState.enemyHero.x + 12, playState.enemyHero.y + 12, {0.4, 0.8, 1}, 'nether')
+            playState.enemyHero:takeDamage(12)
+            playState:addSparks(playState.enemyHero.x + 12, playState.enemyHero.y + 12, {0.3, 0.6, 1}, 'nether')
         end
     end
 end

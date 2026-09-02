@@ -159,6 +159,17 @@ function PlayState:update(dt)
     if self.gameOver then return end
     self.gameTimer = self.gameTimer + dt
 
+    -- Update Visual Effects even when shop is open (so purchase feedback shows)
+    for i = #self.floatingTexts, 1, -1 do
+        local ft = self.floatingTexts[i]
+        ft.life = ft.life - dt
+        ft.y = ft.y + ft.vy * dt
+        ft.opacity = ft.life / 0.8
+        if ft.life <= 0 then
+            table.remove(self.floatingTexts, i)
+        end
+    end
+
     -- Tech Shop input handling if open
     if self.shopOpen then
         return

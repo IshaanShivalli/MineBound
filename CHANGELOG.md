@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Symmetric Defense Targeting**: Player turrets and void anchors now target the Enemy Champion, mirroring how enemy structures already target the player.
+- **Healing Chamber** build option (`4` key) — heals nearby allied units and player hero.
+- **Tech Upgrade Shop** (`B` key) — purchase Blades, Boots, Armor, and Turret upgrades with resources.
+- **Dash** (`E`) and **Ultimate** (`R`) hero abilities with cooldown timers on HUD.
+
+### Fixed
+- **Enemy Turret Placement Bug**: Enemy turrets were placed at out-of-bounds grid positions (row 17 on an 11-row grid) and never appeared. Fixed to spawn at (17,4) and (17,8) on the enemy side.
+- **Void Anchor Range**: Increased anchor hero-targeting range from 100 → 500 pixels (map is 640px wide), so anchors actually function as the major Nether defense structures they're meant to be. Minion targeting range increased from 120 → 300.
+- **Turret Range**: Increased default turret range from 100 → 160 pixels for more effective area denial.
+- **Shop Purchase Feedback**: Floating text (purchase confirmations / insufficient resources) now updates even while the shop modal is open.
+
 ---
 
 ## [1.0.0] - 2026-09-02 — *The Dual-World Dimension Shift Release*

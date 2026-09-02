@@ -13,9 +13,9 @@ function Hero:init(x, y)
     self.baseMaxHealth = 100
     self.maxHealth = self.baseMaxHealth
     self.health = self.maxHealth
-    self.gold = 50
-    self.stone = 30
-    self.voidEssence = 20
+    self.gold = 120
+    self.stone = 80
+    self.voidEssence = 50
 
     self.baseAttackPower = 35
     self.attackPower = self.baseAttackPower

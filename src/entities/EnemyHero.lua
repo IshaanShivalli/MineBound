@@ -5,7 +5,7 @@ function EnemyHero:init(x, y)
     self.y = y or 160
     self.width = 18
     self.height = 18
-    self.speed = 105
+    self.speed = 50
 
     self.maxHealth = 130
     self.health = self.maxHealth

@@ -41,7 +41,10 @@ In **MineBound**, the battlefield spans across two interconnected, parallel dime
 | **Attack / Melee Slash** | `J` or `Left Click` |
 | **Mine / Build Action** | `Space`, `K`, or `Right Click` |
 | **Dimension Shift (Surface ↔ Nether)** | `Q`, `Left Shift`, `Right Shift`, or `Middle Click` |
-| **Select Build Mode** | `1` (Wall: 5 Stone) / `2` (Turret: 25G, 10S) / `3` (Void Anchor: 30 Void Essence, 20G) |
+| **Dash Ability** | `E` (4s cooldown) |
+| **Ultimate Ability** | `R` (14s cooldown) |
+| **Select Build Mode** | `1` (Wall) / `2` (Turret) / `3` (Void Anchor) / `4` (Healing Chamber) |
+| **Open Tech Shop** | `B` |
 | **Pause Game** | `Escape` or `P` |
 | **Menu Confirm / Start** | `Enter` / `Return` / `Space` |
 
@@ -88,18 +91,22 @@ MineBound/
 │   └── push.lua           # Virtual resolution handling (640x360 rendered to 1280x720)
 ├── src/
 │   ├── entities/
+│   │   ├── Boss.lua       # Void Golem neutral boss in Nether (drops Siege Juggernaut on kill)
 │   │   ├── Core.lua       # Overworld Nexus structures, Nether shield logic, and wave spawners
-│   │   ├── Hero.lua       # Player entity (movement, combat, realm shifting, mining, building)
+│   │   ├── EnemyAI.lua    # Strategic AI controller for enemy builds, minions, and economy
+│   │   ├── EnemyHero.lua  # AI-controlled enemy champion (dimension-shifting, combat AI)
+│   │   ├── Hero.lua       # Player entity (movement, combat, realm shifting, mining, building, upgrades)
 │   │   └── Minion.lua     # AI creeps (Overworld soldiers & Nether spectral creeps)
 │   ├── states/
 │   │   ├── BaseState.lua  # Base state template
+│   │   ├── CutsceneState.lua # Story intro cutscene
 │   │   ├── TitleState.lua # Main title menu screen & animated preview
-│   │   ├── PlayState.lua  # Dual-world gameplay loop, HUD, warp FX, parallel updates
+│   │   ├── PlayState.lua  # Dual-world gameplay loop, HUD, shop, warp FX, parallel updates
 │   │   ├── PauseState.lua # Pause overlay
 │   │   └── GameOverState.lua # Victory/Defeat end screen
 │   ├── world/
-│   │   ├── Grid.lua       # Dual-layer dimension grid manager, mining & anchor queries
-│   │   └── Tile.lua       # Dual-world tile definitions, turrets, anchors, portals
+│   │   ├── Grid.lua       # Dual-layer dimension grid manager, mining, random resources & anchor queries
+│   │   └── Tile.lua       # Dual-world tile definitions, turrets, anchors, healing chambers, portals
 │   ├── StateMachine.lua   # Finite state machine manager
 │   └── Util.lua           # Texture and quad helper utilities
 ├── conf.lua               # LÖVE window configuration & dimensions

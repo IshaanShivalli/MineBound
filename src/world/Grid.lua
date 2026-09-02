@@ -35,8 +35,8 @@ function Grid:generateMaps()
         {11, 8, Tile.RIFT_PORTAL},
         {4, 4, Tile.TURRET_PLAYER},
         {8, 4, Tile.TURRET_PLAYER},
-        {4, 17, Tile.TURRET_ENEMY},
-        {8, 17, Tile.TURRET_ENEMY},
+        {17, 4, Tile.TURRET_ENEMY},
+        {17, 8, Tile.TURRET_ENEMY},
     }
 
     for _, pos in ipairs(overworldStructures) do
@@ -164,16 +164,16 @@ function Grid:mineTile(gridX, gridY, damage, dimension)
 
     if tile.type == Tile.GOLD then
         dropType = 'gold'
-        dropAmount = 15
+        dropAmount = 25
     elseif tile.type == Tile.CRYSTAL then
         dropType = 'stone'
-        dropAmount = 25
+        dropAmount = 35
     elseif tile.type == Tile.VOID_CRYSTAL then
         dropType = 'void_essence'
-        dropAmount = 20
+        dropAmount = 30
     elseif tile.type == Tile.WALL or tile.type == Tile.VOID_WALL then
         dropType = 'stone'
-        dropAmount = 10
+        dropAmount = 15
     end
 
     local destroyed = tile:takeDamage(damage or 25)
