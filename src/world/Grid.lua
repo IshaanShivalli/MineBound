@@ -34,7 +34,11 @@ function Grid:generateMaps()
         {10, 4, Tile.RIFT_PORTAL},
         {11, 8, Tile.RIFT_PORTAL},
         {4, 4, Tile.TURRET_PLAYER},
+        {4, 8, Tile.TURRET_PLAYER},
         {8, 4, Tile.TURRET_PLAYER},
+        {8, 8, Tile.TURRET_PLAYER},
+        {13, 4, Tile.TURRET_ENEMY},
+        {13, 8, Tile.TURRET_ENEMY},
         {17, 4, Tile.TURRET_ENEMY},
         {17, 8, Tile.TURRET_ENEMY},
     }

@@ -76,6 +76,16 @@ function Minion:update(dt, playState)
         end
     end
 
+    -- If player minion and enemy hero is near in same dimension, target enemy hero
+    if self.owner == 'player' and playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == self.dimension then
+        local d = Distance(self.x, self.y, playState.enemyHero.x, playState.enemyHero.y)
+        if d < closestDist then
+            target = playState.enemyHero
+            targetX = playState.enemyHero.x + playState.enemyHero.width / 2
+            targetY = playState.enemyHero.y + playState.enemyHero.height / 2
+        end
+    end
+
     -- If in Overworld and close to target core
     if self.dimension == 'overworld' then
         local coreDist = Distance(self.x, self.y, self.targetCore.x + self.targetCore.size / 2, self.targetCore.y + self.targetCore.size / 2)
