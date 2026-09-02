@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the **MineBound** project will be documented in this file.
+All notable changes to the **MineBound: Dual-World Dimension Shift** project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -11,33 +11,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.0] - 2026-09-02 — *The Dual-World Dimension Shift Release*
+
+### Added
+- **Dual-World Dimensional System**:
+  - Added dual-layer parallel world simulation in `Grid.lua`: **Overworld (Surface Realm)** and **Nether Realm (Void Underworld)**.
+  - Dimension Shifting mechanic triggered via `Q`, `Shift`, or stepping onto dimensional `Rift Portals`.
+  - Added warp shockwave animations, purple particle bursts, and `shift.wav` sound effect on realm transitions.
+- **Topological Inversion & Exploration**:
+  - Asymmetrical path layout between Overworld (blocked center, open sides) and Nether Realm (open center, obsidian edges) allowing players to flank enemy defenses and bypass obstacles.
+- **Dual-World Economy & Resources**:
+  - Overworld resource nodes: **Gold** and **Stone**.
+  - Nether Realm resource nodes: **Soul Crystals / Void Essence**.
+  - Added UI icon and HUD tracker for **Void Essence**.
+- **Nether Anchors & Cross-World Core Shielding**:
+  - Added **Player Nether Anchor** and **Enemy Nether Anchor** structures in the Nether Realm.
+  - While the Enemy Nether Anchor is intact, the Enemy Nexus in the Overworld is enveloped by a **Dimensional Shield (50% damage reduction)**.
+  - Destroying the Nether Anchor shatters the enemy Nexus shield, opening a clear path to victory.
+- **Spectral Void Minions**:
+  - Implemented Nether Realm creep waves (`minion_void_player`, `minion_void_enemy`) that engage in underworld skirmishes.
+- **New Build Mode**:
+  - Key `3`: Build **Void Anchors** (costs 30 Void Essence, 20 Gold) which pulse defensive laser attacks against nearby Nether intruders.
+
+---
+
 ## [0.2.0] - 2026-09-02
 
 ### Added
-- Comprehensive `CHANGELOG.md` to track project versions and updates.
-- Expanded `README.md` with complete gameplay breakdown, control scheme mapping, run instructions, and folder architecture.
-- Added range-string parser support (e.g., `'1-2'`, `'2-3'`) to `Grid:getFrames` in `lib/anim8.lua`.
+- Comprehensive `CHANGELOG.md` and initial `README.md`.
+- Range string parser support (e.g. `'1-2'`, `'2-3'`) in `lib/anim8.lua`.
 
 ### Fixed
-- **TitleState runtime crash**: Added missing `__call` metamethod onto `Grid` in `lib/anim8.lua` so grid objects can be invoked directly as functions (`g(...)`) for frame slicing.
+- Fixed crash in `TitleState` by defining the `__call` metamethod on `Grid` in `lib/anim8.lua`.
 
 ---
 
 ## [0.1.0] - 2026-09-02
 
 ### Added
-- **Core Engine & Architecture**:
-  - Initialized LÖVE 11.5 project configuration (`conf.lua`) with $1280 \times 720$ window and vsync.
-  - Virtual resolution scaling ($640 \times 360$) via `push.lua`.
-  - Finite State Machine (`StateMachine.lua`) supporting `TitleState`, `PlayState`, `PauseState`, and `GameOverState`.
-- **World & Tile Grid**:
-  - 2D grid arena generation (`Grid.lua`, `Tile.lua`) with grass, stone deposits, gold nodes, walls, and defense turrets.
-  - Mining and building mechanics for defensive fortification.
-- **Entities & Combat**:
-  - Controllable `Hero` with 4-directional movement, melee attack swing, resource inventories, and build modes.
-  - Automated `Minion` lane creeps with aggro targeting, pathing, and attack loops.
-  - Player and Enemy `Core` structures that act as win/loss objective anchors and minion wave spawners.
-- **Visuals & Audio FX**:
-  - Top HUD overlay with health bars, resource counters (Gold/Stone), active build selection, and wave timers.
-  - Dynamic visual particle effects: floating damage/resource text, spark particles, slash arcs, and turret laser beams.
-  - Sound effects for swings, hits, mining, construction, explosions, and UI clicks.
+- Initial single-world prototype with StateMachine, Hero movement, mining, and minion spawning.

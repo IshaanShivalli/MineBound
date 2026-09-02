@@ -93,6 +93,11 @@ function Animation:update(dt)
     end
 end
 
+function Animation:gotoFrame(frame)
+    self.currentFrame = math.clamp(frame or 1, 1, #self.frames)
+    self.timer = 0
+end
+
 function Animation:draw(image, x, y, r, sx, sy, ox, oy)
     love.graphics.draw(image, self.frames[self.currentFrame], x, y, r, sx, sy, ox, oy)
 end

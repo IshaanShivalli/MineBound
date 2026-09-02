@@ -4,6 +4,7 @@ local Tile = require 'src.world.Tile'
 local Hero = require 'src.entities.Hero'
 local Core = require 'src.entities.Core'
 local Minion = require 'src.entities.Minion'
+local EnemyAI = require 'src.entities.EnemyAI'
 
 PlayState = Class{__includes = BaseState}
 
@@ -18,12 +19,19 @@ function PlayState:init()
 
     self.hero = Hero(TILE_SIZE * 3, TILE_SIZE * 5)
     self.minions = {}
+    self.enemyAI = EnemyAI(self)
 
-    -- Visual Effects
+    -- Visual Effects (dimension-tagged)
     self.floatingTexts = {}
     self.sparks = {}
     self.slashes = {}
     self.lasers = {}
+
+    -- Dimension Transition FX
+    self.shiftTransitionTimer = 0
+    self.shiftTransitionMax = 0.35
+    self.currentRenderDim = 'overworld'
+    self.riftNearby = false
 
     self.gameOver = false
     self.gameTimer = 0
@@ -36,19 +44,40 @@ function PlayState:enter(params)
     end
 end
 
-function PlayState:addFloatingText(x, y, text, color)
+function PlayState:triggerDimensionShift(targetDim)
+    self.shiftTransitionTimer = self.shiftTransitionMax
+    self.currentRenderDim = targetDim
+
+    -- Spawn dimensional warp sparkles around hero
+    for i = 1, 14 do
+        local angle = math.random() * math.pi * 2
+        local spd = math.random(50, 140)
+        table.insert(self.sparks, {
+            x = self.hero.x + self.hero.width / 2,
+            y = self.hero.y + self.hero.height / 2,
+            vx = math.cos(angle) * spd,
+            vy = math.sin(angle) * spd,
+            life = 0.4,
+            dimension = targetDim,
+            color = (targetDim == 'nether') and {0.9, 0.3, 1} or {0.3, 0.9, 1}
+        })
+    end
+end
+
+function PlayState:addFloatingText(x, y, text, color, dimension)
     table.insert(self.floatingTexts, {
         x = x,
         y = y,
         text = text,
         color = color or {1, 1, 1},
+        dimension = dimension or self.hero.dimension,
         opacity = 1.0,
         vy = -25,
         life = 0.8
     })
 end
 
-function PlayState:addSparks(x, y)
+function PlayState:addSparks(x, y, color, dimension)
     for i = 1, 6 do
         local angle = math.random() * math.pi * 2
         local spd = math.random(30, 90)
@@ -58,27 +87,30 @@ function PlayState:addSparks(x, y)
             vx = math.cos(angle) * spd,
             vy = math.sin(angle) * spd,
             life = 0.25,
-            color = {1, math.random(0.6, 0.9), 0.2}
+            dimension = dimension or self.hero.dimension,
+            color = color or {1, math.random(0.6, 0.9), 0.2}
         })
     end
 end
 
-function PlayState:addSlashEffect(x, y)
+function PlayState:addSlashEffect(x, y, dimension)
     table.insert(self.slashes, {
         x = x,
         y = y,
+        dimension = dimension or self.hero.dimension,
         life = 0.15,
         radius = 20
     })
 end
 
-function PlayState:addLaser(x1, y1, x2, y2, color)
+function PlayState:addLaser(x1, y1, x2, y2, color, dimension)
     table.insert(self.lasers, {
         x1 = x1,
         y1 = y1,
         x2 = x2,
         y2 = y2,
         color = color,
+        dimension = dimension or 'overworld',
         life = 0.12
     })
 end
@@ -87,21 +119,31 @@ function PlayState:update(dt)
     if self.gameOver then return end
     self.gameTimer = self.gameTimer + dt
 
+    if self.shiftTransitionTimer > 0 then
+        self.shiftTransitionTimer = self.shiftTransitionTimer - dt
+    end
+
     -- Update Entities
     self.hero:update(dt, self.grid, self)
     self.grid:update(dt, self)
     self.playerCore:update(dt, self)
     self.enemyCore:update(dt, self)
+    self.enemyAI:update(dt)
 
-    -- Update Minions
+    -- Update Minions across both dimensions
     for i = #self.minions, 1, -1 do
         local minion = self.minions[i]
         minion:update(dt, self)
         if not minion:isAlive() then
-            self:addSparks(minion.x + minion.size / 2, minion.y + minion.size / 2)
+            self:addSparks(minion.x + minion.size / 2, minion.y + minion.size / 2, (minion.dimension == 'nether') and {0.9, 0.4, 1} or {1, 0.8, 0.2}, minion.dimension)
             if minion.owner == 'enemy' then
-                self.hero.gold = self.hero.gold + 5
-                self:addFloatingText(minion.x, minion.y, "+5 Gold", {1, 0.8, 0.2})
+                if minion.dimension == 'nether' then
+                    self.hero.voidEssence = self.hero.voidEssence + 8
+                    self:addFloatingText(minion.x, minion.y, "+8 Gems", {0.9, 0.4, 1.0}, 'nether')
+                else
+                    self.hero.gold = self.hero.gold + 5
+                    self:addFloatingText(minion.x, minion.y, "+5 Coins", {1, 0.8, 0.2}, 'overworld')
+                end
             end
             table.remove(self.minions, i)
         end
@@ -166,12 +208,21 @@ function PlayState:keypressed(key)
         self.hero:mineOrBuild(self.grid, self)
     elseif key == 'j' or key == 'lctrl' then
         self.hero:attack(self)
+    elseif key == 'q' or key == 'lshift' or key == 'rshift' then
+        self.hero:shiftDimension(self.grid, self)
     elseif key == '1' then
         self.hero.buildSelection = 'wall'
-        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Stone Wall (5 Stone)", {0.9, 0.9, 0.9})
+        local wallName = (self.hero.dimension == 'nether') and "Obsidian Wall (5 Ores)" or "Stone Wall (5 Ores)"
+        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: " .. wallName, {0.9, 0.9, 0.9}, self.hero.dimension)
     elseif key == '2' then
         self.hero.buildSelection = 'turret'
-        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Turret (25 Gold, 10 Stone)", {0.3, 0.8, 1})
+        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Laser Turret (25 Coins, 10 Ores)", {0.3, 0.8, 1}, self.hero.dimension)
+    elseif key == '3' then
+        self.hero.buildSelection = 'anchor'
+        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Void Anchor (30 Gems, 20 Coins)", {0.9, 0.4, 1.0}, self.hero.dimension)
+    elseif key == '4' then
+        self.hero.buildSelection = 'healer'
+        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Healing Chamber (50 Coins, 60 Ores, 20 Gems)", {0.2, 1.0, 0.5}, self.hero.dimension)
     end
 end
 
@@ -180,12 +231,23 @@ function PlayState:mousepressed(x, y, button)
         self.hero:attack(self)
     elseif button == 2 then
         self.hero:mineOrBuild(self.grid, self)
+    elseif button == 3 then
+        self.hero:shiftDimension(self.grid, self)
     end
 end
 
 function PlayState:render()
-    -- Render Tile Map
-    self.grid:render()
+    local curDim = self.hero.dimension
+
+    -- Render Active Dimension Tile Map
+    self.grid:render(curDim)
+
+    -- In Nether Realm: Draw atmospheric void overlay
+    if curDim == 'nether' then
+        love.graphics.setColor(0.2, 0.05, 0.35, 0.18)
+        love.graphics.rectangle('fill', 0, 0, push:getWidth(), push:getHeight())
+        love.graphics.setColor(1, 1, 1, 1)
+    end
 
     -- Render Target Indicator for Hero
     local tgx, tgy = self.hero:getTargetGridPosition(self.grid)
@@ -194,89 +256,147 @@ function PlayState:render()
     love.graphics.rectangle('line', twx, twy, TILE_SIZE, TILE_SIZE)
     love.graphics.setColor(1, 1, 1, 1)
 
-    -- Render Cores
-    self.playerCore:render()
-    self.enemyCore:render()
+    -- Render Cores (if in Overworld, or ghosted silhouette if in Nether)
+    if curDim == 'overworld' then
+        self.playerCore:render(self)
+        self.enemyCore:render(self)
+    else
+        -- Ghost indicator in Nether of where Overworld cores are
+        love.graphics.setColor(0.3, 0.7, 1.0, 0.25)
+        love.graphics.rectangle('line', self.playerCore.x, self.playerCore.y, 32, 32)
+        love.graphics.setColor(1.0, 0.3, 0.3, 0.25)
+        love.graphics.rectangle('line', self.enemyCore.x, self.enemyCore.y, 32, 32)
+        love.graphics.setColor(1, 1, 1, 1)
+    end
 
-    -- Render Minions
+    -- Render Minions only in current dimension
     for _, minion in ipairs(self.minions) do
-        minion:render()
+        if minion.dimension == curDim then
+            minion:render()
+        end
     end
 
     -- Render Hero
     self.hero:render()
 
-    -- Render Lasers
+    -- Render Lasers strictly matching the active realm
     for _, lz in ipairs(self.lasers) do
-        love.graphics.setColor(lz.color[1], lz.color[2], lz.color[3], lz.life / 0.12)
-        love.graphics.setLineWidth(3)
-        love.graphics.line(lz.x1, lz.y1, lz.x2, lz.y2)
-        love.graphics.setLineWidth(1)
+        if lz.dimension == curDim then
+            love.graphics.setColor(lz.color[1], lz.color[2], lz.color[3], lz.life / 0.12)
+            love.graphics.setLineWidth(3)
+            love.graphics.line(lz.x1, lz.y1, lz.x2, lz.y2)
+            love.graphics.setLineWidth(1)
+        end
     end
 
-    -- Render Slashes
+    -- Render Slashes strictly matching the active realm
     for _, sl in ipairs(self.slashes) do
-        love.graphics.setColor(1, 1, 1, sl.life / 0.15)
-        love.graphics.circle('line', sl.x, sl.y, sl.radius)
+        if sl.dimension == curDim then
+            love.graphics.setColor(1, 1, 1, sl.life / 0.15)
+            love.graphics.circle('line', sl.x, sl.y, sl.radius)
+        end
     end
 
-    -- Render Sparks
+    -- Render Sparks strictly matching the active realm
     for _, sp in ipairs(self.sparks) do
-        love.graphics.setColor(sp.color[1], sp.color[2], sp.color[3], sp.life / 0.25)
-        love.graphics.rectangle('fill', sp.x, sp.y, 2, 2)
+        if sp.dimension == curDim then
+            love.graphics.setColor(sp.color[1], sp.color[2], sp.color[3], sp.life / 0.25)
+            love.graphics.rectangle('fill', sp.x, sp.y, 2, 2)
+        end
     end
 
-    -- Render Floating Texts
+    -- Render Floating Texts strictly matching the active realm
     love.graphics.setFont(gFonts['small'])
     for _, ft in ipairs(self.floatingTexts) do
-        love.graphics.setColor(ft.color[1], ft.color[2], ft.color[3], ft.opacity)
-        love.graphics.printf(ft.text, ft.x - 40, ft.y, 80, 'center')
+        if ft.dimension == curDim then
+            love.graphics.setColor(ft.color[1], ft.color[2], ft.color[3], ft.opacity)
+            love.graphics.printf(ft.text, ft.x - 60, ft.y, 120, 'center')
+        end
     end
 
-    -- HUD Overlay (Top Bar)
+    -- Dimensional Warp Screen Flash / Shockwave
+    if self.shiftTransitionTimer > 0 then
+        local alpha = (self.shiftTransitionTimer / self.shiftTransitionMax) * 0.45
+        local col = (curDim == 'nether') and {0.8, 0.2, 1.0} or {0.2, 0.8, 1.0}
+        love.graphics.setColor(col[1], col[2], col[3], alpha)
+        love.graphics.rectangle('fill', 0, 0, push:getWidth(), push:getHeight())
+        love.graphics.setColor(1, 1, 1, 1)
+    end
+
+    -- HUD Overlay (Top Bar & Dimension Indicator)
     self:renderHUD()
 end
 
 function PlayState:renderHUD()
+    local curDim = self.hero.dimension
+
     -- Top Bar Background
-    love.graphics.setColor(0.05, 0.07, 0.1, 0.85)
+    love.graphics.setColor(0.04, 0.06, 0.1, 0.88)
     love.graphics.rectangle('fill', 0, 0, push:getWidth(), 24)
     love.graphics.setColor(0.2, 0.25, 0.35, 1)
     love.graphics.line(0, 24, push:getWidth(), 24)
 
     -- Hero HP
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(gTextures['ui'], gFrames['ui'][1], 8, 4)
+    love.graphics.draw(gTextures['ui'], gFrames['ui'][1], 6, 4)
     love.graphics.setFont(gFonts['medium'])
     love.graphics.setColor(0.2, 0.9, 0.3, 1)
-    love.graphics.print(self.hero.health .. '/' .. self.hero.maxHealth, 28, 4)
+    love.graphics.print(self.hero.health .. '/' .. self.hero.maxHealth, 24, 4)
 
-    -- Gold
+    -- Coins (Gold)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(gTextures['ui'], gFrames['ui'][2], 100, 4)
+    love.graphics.draw(gTextures['ui'], gFrames['ui'][2], 85, 4)
     love.graphics.setColor(1, 0.85, 0.2, 1)
-    love.graphics.print(tostring(self.hero.gold), 120, 4)
+    love.graphics.print(tostring(self.hero.gold), 105, 4)
 
-    -- Stone
+    -- Ores (Stone)
     love.graphics.setColor(1, 1, 1, 1)
-    love.graphics.draw(gTextures['ui'], gFrames['ui'][3], 170, 4)
+    love.graphics.draw(gTextures['ui'], gFrames['ui'][3], 145, 4)
     love.graphics.setColor(0.85, 0.85, 0.9, 1)
-    love.graphics.print(tostring(self.hero.stone), 190, 4)
+    love.graphics.print(tostring(self.hero.stone), 165, 4)
 
-    -- Active Build Selection
+    -- Gems (Void Essence)
+    love.graphics.setColor(1, 1, 1, 1)
+    love.graphics.draw(gTextures['ui'], gFrames['ui'][4], 205, 4)
+    love.graphics.setColor(0.9, 0.4, 1.0, 1)
+    love.graphics.print(tostring(self.hero.voidEssence), 225, 4)
+
+    -- Current Dimension Badge
     love.graphics.setFont(gFonts['small'])
-    love.graphics.setColor(0.7, 0.8, 0.9, 1)
-    local buildText = (self.hero.buildSelection == 'wall') and '[1] Wall (5 Stone)' or '[2] Turret (25G, 10S)'
-    love.graphics.print('Build [1/2]: ' .. buildText, 250, 6)
+    if curDim == 'overworld' then
+        love.graphics.setColor(0.2, 0.6, 1.0, 0.9)
+        love.graphics.rectangle('fill', 270, 4, 90, 16, 3, 3)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.printf("[SURFACE REALM]", 270, 7, 90, 'center')
+    else
+        love.graphics.setColor(0.8, 0.2, 0.9, 0.9)
+        love.graphics.rectangle('fill', 270, 4, 90, 16, 3, 3)
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.printf("[NETHER REALM]", 270, 7, 90, 'center')
+    end
 
-    -- Next Minion Wave Timer
+    -- Nether Anchor / Underworld AI Status
+    local enemyAnchor = self.grid:getAnchor('nether', 'enemy')
+    if enemyAnchor then
+        love.graphics.setColor(0.9, 0.3, 0.8, 1)
+        love.graphics.print('Underworld Anchor: ' .. enemyAnchor.health .. 'HP (Shielding Core!)', 370, 6)
+    else
+        love.graphics.setColor(0.3, 0.9, 0.4, 1)
+        love.graphics.print('Underworld Anchor: DESTROYED (Core Vulnerable!)', 370, 6)
+    end
+
+    -- Next Wave Timer
     local waveTimeLeft = math.max(0, math.ceil(self.playerCore.spawnInterval - self.playerCore.spawnTimer))
     love.graphics.setColor(0.9, 0.9, 0.5, 1)
-    love.graphics.print('Next Wave: ' .. waveTimeLeft .. 's', 460, 6)
+    love.graphics.print('Wave: ' .. waveTimeLeft .. 's', 575, 6)
 
-    -- Bottom Controls Hint
-    love.graphics.setColor(1, 1, 1, 0.6)
-    love.graphics.print('WASD: Move | J / L-Click: Attack | Space / K / R-Click: Mine/Build | 1/2: Select Build | Esc: Pause', 8, push:getHeight() - 14)
+    -- Bottom Controls Hint Bar
+    love.graphics.setColor(0.04, 0.06, 0.1, 0.8)
+    love.graphics.rectangle('fill', 0, push:getHeight() - 16, push:getWidth(), 16)
+    love.graphics.setColor(1, 1, 1, 0.75)
+    love.graphics.setFont(gFonts['small'])
+    local shiftPrompt = (self.hero.shiftCooldown <= 0) and 'Q/Shift: [SHIFT REALM]' or 'Q: Cooldown'
+    love.graphics.print('WASD: Move | J: Attack | Space: Mine/Build | ' .. shiftPrompt .. ' | 1:Wall 2:Turret 3:Anchor 4:Healer | Esc: Pause', 6, push:getHeight() - 13)
     love.graphics.setColor(1, 1, 1, 1)
 end
 

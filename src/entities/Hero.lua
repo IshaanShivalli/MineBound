@@ -13,6 +13,11 @@ function Hero:init(x, y)
     self.health = self.maxHealth
     self.gold = 50
     self.stone = 30
+    self.voidEssence = 20
+
+    self.dimension = 'overworld' -- 'overworld' or 'nether'
+    self.shiftCooldown = 0
+    self.shiftCooldownMax = 1.0
 
     self.direction = 'right'
     self.isMoving = false
@@ -26,7 +31,7 @@ function Hero:init(x, y)
     self.invulnerable = false
     self.invulnTimer = 0
 
-    self.buildSelection = 'wall' -- 'wall' or 'turret'
+    self.buildSelection = 'wall' -- 'wall', 'turret', 'anchor', 'healer'
 
     -- Anim8 setup
     local g = anim8.newGrid(24, 24, gTextures['hero']:getWidth(), gTextures['hero']:getHeight())
@@ -76,6 +81,29 @@ function Hero:getTargetGridPosition(grid)
     return grid:worldToGrid(centerX, centerY)
 end
 
+function Hero:shiftDimension(grid, playState)
+    if self.shiftCooldown > 0 or not self:isAlive() then return end
+
+    local targetDim = (self.dimension == 'overworld') and 'nether' or 'overworld'
+    
+    -- Check if target dimension position is solid
+    if self:collidesWithSolid(self.x, self.y, grid, targetDim) then
+        playState:addFloatingText(self.x, self.y - 12, "Material Collision in " .. targetDim:upper() .. "!", {1, 0.4, 0.4}, self.dimension)
+        return
+    end
+
+    self.dimension = targetDim
+    self.shiftCooldown = self.shiftCooldownMax
+
+    gSounds['shift']:stop()
+    gSounds['shift']:play()
+
+    playState:triggerDimensionShift(self.dimension)
+    local text = (self.dimension == 'nether') and ">> ENTERING NETHER REALM <<" or ">> RETURNING TO OVERWORLD <<"
+    local col = (self.dimension == 'nether') and {0.9, 0.4, 1.0} or {0.4, 0.9, 1.0}
+    playState:addFloatingText(self.x - 10, self.y - 16, text, col, self.dimension)
+end
+
 function Hero:update(dt, grid, playState)
     if not self:isAlive() then return end
 
@@ -89,6 +117,10 @@ function Hero:update(dt, grid, playState)
 
     if self.mineCooldown > 0 then
         self.mineCooldown = self.mineCooldown - dt
+    end
+
+    if self.shiftCooldown > 0 then
+        self.shiftCooldown = self.shiftCooldown - dt
     end
 
     if self.invulnerable then
@@ -122,26 +154,34 @@ function Hero:update(dt, grid, playState)
     self.isMoving = (dx ~= 0 or dy ~= 0)
 
     if self.isMoving then
-        -- Normalize
         local len = math.sqrt(dx * dx + dy * dy)
         dx = (dx / len) * self.speed * dt
         dy = (dy / len) * self.speed * dt
 
-        -- Move X with collision
+        -- Move X with collision in current dimension
         local nextX = self.x + dx
-        if not self:collidesWithSolid(nextX, self.y, grid) then
+        if not self:collidesWithSolid(nextX, self.y, grid, self.dimension) then
             self.x = nextX
         end
 
-        -- Move Y with collision
+        -- Move Y with collision in current dimension
         local nextY = self.y + dy
-        if not self:collidesWithSolid(self.x, nextY, grid) then
+        if not self:collidesWithSolid(self.x, nextY, grid, self.dimension) then
             self.y = nextY
         end
 
         -- Keep within virtual screen bounds
         self.x = math.clamp(self.x, 0, push:getWidth() - self.width)
         self.y = math.clamp(self.y, 0, push:getHeight() - self.height)
+    end
+
+    -- Check if standing on a Rift Portal
+    local gx, gy = self:getGridPosition(grid)
+    local curTile = grid:getTile(gx, gy, self.dimension)
+    if curTile and curTile.type == Tile.RIFT_PORTAL and self.shiftCooldown <= 0 then
+        playState.riftNearby = true
+    else
+        playState.riftNearby = false
     end
 
     -- Update animation
@@ -156,8 +196,8 @@ function Hero:update(dt, grid, playState)
     self.currentAnimation:update(dt)
 end
 
-function Hero:collidesWithSolid(x, y, grid)
-    -- Check 4 corners of bounding box
+function Hero:collidesWithSolid(x, y, grid, dimension)
+    dimension = dimension or self.dimension
     local points = {
         {x + 2, y + 2},
         {x + self.width - 2, y + 2},
@@ -167,13 +207,28 @@ function Hero:collidesWithSolid(x, y, grid)
 
     for _, pt in ipairs(points) do
         local gx, gy = grid:worldToGrid(pt[1], pt[2])
-        local tile = grid:getTile(gx, gy)
+        local tile = grid:getTile(gx, gy, dimension)
         if tile and tile:isSolid() then
             return true
         end
     end
 
     return false
+end
+
+-- Checks if placing a solid structure at (gx, gy) would intersect hero bounding box
+function Hero:isIntersectingTile(gx, gy)
+    local tileLeft = (gx - 1) * 32
+    local tileRight = gx * 32
+    local tileTop = (gy - 1) * 32
+    local tileBottom = gy * 32
+
+    local heroLeft = self.x
+    local heroRight = self.x + self.width
+    local heroTop = self.y
+    local heroBottom = self.y + self.height
+
+    return not (heroRight <= tileLeft or heroLeft >= tileRight or heroBottom <= tileTop or heroTop >= tileBottom)
 end
 
 function Hero:attack(playState)
@@ -187,27 +242,45 @@ function Hero:attack(playState)
     local slashX = self.x + self.width / 2 + (self.direction == 'left' and -20 or (self.direction == 'right' and 20 or 0))
     local slashY = self.y + self.height / 2 + (self.direction == 'up' and -20 or (self.direction == 'down' and 20 or 0))
 
-    playState:addSlashEffect(slashX, slashY)
+    playState:addSlashEffect(slashX, slashY, self.dimension)
     gSounds['hit']:stop()
     gSounds['hit']:play()
 
-    -- Damage nearby enemy minions
     local hitRadius = 32
+
+    -- Damage nearby enemy minions in same dimension
     for _, minion in ipairs(playState.minions) do
-        if minion:isAlive() and minion.owner == 'enemy' then
+        if minion:isAlive() and minion.owner == 'enemy' and minion.dimension == self.dimension then
             local d = Distance(slashX, slashY, minion.x + minion.size / 2, minion.y + minion.size / 2)
             if d <= hitRadius then
                 minion:takeDamage(35)
-                playState:addFloatingText(minion.x, minion.y - 4, "-35", {1, 0.3, 0.3})
+                playState:addFloatingText(minion.x, minion.y - 4, "-35", {1, 0.3, 0.3}, self.dimension)
             end
         end
     end
 
-    -- Damage enemy core if close
-    local dCore = Distance(slashX, slashY, playState.enemyCore.x + playState.enemyCore.size / 2, playState.enemyCore.y + playState.enemyCore.size / 2)
-    if dCore <= hitRadius + playState.enemyCore.size / 2 then
-        playState.enemyCore:takeDamage(25)
-        playState:addFloatingText(playState.enemyCore.x, playState.enemyCore.y - 8, "-25", {1, 0.2, 0.2})
+    -- Damage enemy core if in Overworld
+    if self.dimension == 'overworld' then
+        local dCore = Distance(slashX, slashY, playState.enemyCore.x + playState.enemyCore.size / 2, playState.enemyCore.y + playState.enemyCore.size / 2)
+        if dCore <= hitRadius + playState.enemyCore.size / 2 then
+            local enemyAnchor = playState.grid:getAnchor('nether', 'enemy')
+            local dmg = enemyAnchor and 15 or 30
+            playState.enemyCore:takeDamage(dmg)
+            if enemyAnchor then
+                playState:addFloatingText(playState.enemyCore.x, playState.enemyCore.y - 8, "-" .. dmg .. " (Shielded!)", {0.8, 0.5, 1}, 'overworld')
+            else
+                playState:addFloatingText(playState.enemyCore.x, playState.enemyCore.y - 8, "-" .. dmg, {1, 0.2, 0.2}, 'overworld')
+            end
+        end
+    else
+        -- In Nether: Damage Enemy Nether Anchor if in range
+        local gx, gy = playState.grid:worldToGrid(slashX, slashY)
+        local tile = playState.grid:getTile(gx, gy, 'nether')
+        if tile and tile.type == Tile.NETHER_ANCHOR_ENEMY then
+            tile:takeDamage(35)
+            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "-35 Anchor", {1, 0.4, 0.8}, 'nether')
+            playState:addSparks((gx - 0.5) * 32, (gy - 0.5) * 32, {1, 0.3, 0.8}, 'nether')
+        end
     end
 end
 
@@ -216,48 +289,79 @@ function Hero:mineOrBuild(grid, playState)
     self.mineCooldown = self.mineCooldownMax
 
     local gx, gy = self:getTargetGridPosition(grid)
-    local tile = grid:getTile(gx, gy)
+    local tile = grid:getTile(gx, gy, self.dimension)
     if not tile then return end
 
     if tile:isSolid() then
-        -- Mining
-        local dropType, dropAmount = grid:mineTile(gx, gy, 35)
+        -- Mining in current dimension
+        local dropType, dropAmount = grid:mineTile(gx, gy, 35, self.dimension)
         gSounds['mine']:stop()
         gSounds['mine']:play()
-        playState:addSparks((gx - 0.5) * 32, (gy - 0.5) * 32)
+        playState:addSparks((gx - 0.5) * 32, (gy - 0.5) * 32, nil, self.dimension)
 
         if dropType == 'gold' then
             self.gold = self.gold + dropAmount
-            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Gold", {1, 0.85, 0.2})
-        elseif dropType == 'crystal' then
-            self.gold = self.gold + dropAmount
-            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Mana Gold", {0.3, 0.9, 1})
+            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Coins", {1, 0.85, 0.2}, self.dimension)
         elseif dropType == 'stone' then
             self.stone = self.stone + dropAmount
-            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Stone", {0.8, 0.8, 0.8})
+            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Ores", {0.8, 0.8, 0.8}, self.dimension)
+        elseif dropType == 'void_essence' then
+            self.voidEssence = self.voidEssence + dropAmount
+            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Gems", {0.9, 0.4, 1.0}, self.dimension)
         end
     else
-        -- Building
+        -- ANTI-STICKING CHECK: Prevent hero from placing a solid block directly inside their own body hitbox
+        if self:isIntersectingTile(gx, gy) then
+            playState:addFloatingText(self.x, self.y - 12, "Step away to build!", {1, 0.5, 0.2}, self.dimension)
+            return
+        end
+
+        -- Building in current dimension
         if self.buildSelection == 'wall' then
             if self.stone >= 5 then
                 self.stone = self.stone - 5
-                grid:buildTile(gx, gy, Tile.WALL)
+                local wallType = (self.dimension == 'nether') and Tile.VOID_WALL or Tile.WALL
+                grid:buildTile(gx, gy, wallType, self.dimension)
                 gSounds['build']:stop()
                 gSounds['build']:play()
-                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Wall Built", {0.8, 0.8, 0.8})
+                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Wall Built", {0.8, 0.8, 0.8}, self.dimension)
             else
-                playState:addFloatingText(self.x, self.y - 12, "Need 5 Stone!", {1, 0.4, 0.4})
+                playState:addFloatingText(self.x, self.y - 12, "Need 5 Ores!", {1, 0.4, 0.4}, self.dimension)
             end
         elseif self.buildSelection == 'turret' then
             if self.gold >= 25 and self.stone >= 10 then
                 self.gold = self.gold - 25
                 self.stone = self.stone - 10
-                grid:buildTile(gx, gy, Tile.TURRET_PLAYER)
+                grid:buildTile(gx, gy, Tile.TURRET_PLAYER, self.dimension)
                 gSounds['build']:stop()
                 gSounds['build']:play()
-                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Turret Built!", {0.3, 0.7, 1})
+                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Turret Built!", {0.3, 0.7, 1}, self.dimension)
             else
-                playState:addFloatingText(self.x, self.y - 12, "Need 25 Gold, 10 Stone!", {1, 0.4, 0.4})
+                playState:addFloatingText(self.x, self.y - 12, "Need 25 Coins, 10 Ores!", {1, 0.4, 0.4}, self.dimension)
+            end
+        elseif self.buildSelection == 'anchor' then
+            if self.voidEssence >= 30 and self.gold >= 20 then
+                self.voidEssence = self.voidEssence - 30
+                self.gold = self.gold - 20
+                grid:buildTile(gx, gy, Tile.NETHER_ANCHOR_PLAYER, self.dimension)
+                gSounds['build']:stop()
+                gSounds['build']:play()
+                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Void Anchor Built!", {0.9, 0.4, 1.0}, self.dimension)
+            else
+                playState:addFloatingText(self.x, self.y - 12, "Need 30 Gems, 20 Coins!", {1, 0.4, 0.4}, self.dimension)
+            end
+        elseif self.buildSelection == 'healer' then
+            -- Healing Chamber: 50 coins, 60 ores, 20 gems
+            if self.gold >= 50 and self.stone >= 60 and self.voidEssence >= 20 then
+                self.gold = self.gold - 50
+                self.stone = self.stone - 60
+                self.voidEssence = self.voidEssence - 20
+                grid:buildTile(gx, gy, Tile.HEALING_CHAMBER, self.dimension)
+                gSounds['build']:stop()
+                gSounds['build']:play()
+                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Healing Chamber Built!", {0.2, 1.0, 0.5}, self.dimension)
+            else
+                playState:addFloatingText(self.x, self.y - 12, "Need 50 Coins, 60 Ores, 20 Gems!", {1, 0.4, 0.4}, self.dimension)
             end
         end
     end
@@ -270,6 +374,12 @@ function Hero:render()
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.ellipse('fill', self.x + self.width / 2, self.y + self.height - 2, 8, 4)
 
+    -- Dimension aura / tint
+    if self.dimension == 'nether' then
+        love.graphics.setColor(0.9, 0.4, 1.0, 0.3)
+        love.graphics.circle('fill', self.x + self.width / 2, self.y + self.height / 2, 14)
+    end
+
     -- Invulnerability blink
     if self.invulnerable and math.floor(love.timer.getTime() * 12) % 2 == 0 then
         love.graphics.setColor(1, 1, 1, 0.4)
@@ -280,7 +390,6 @@ function Hero:render()
     local drawX = self.x - 3
     local drawY = self.y - 6
     local scaleX = (self.direction == 'left') and -1 or 1
-    local originX = (self.direction == 'left') and 24 or 0
 
     self.currentAnimation:draw(gTextures['hero'], drawX + (self.direction == 'left' and 24 or 0), drawY, 0, scaleX, 1)
 

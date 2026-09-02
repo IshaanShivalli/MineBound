@@ -255,6 +255,17 @@ def generate_tileset():
     draw.polygon([(fx + 16, 2), (fx + 28, 16), (fx + 16, 30), (fx + 4, 16)], fill=(240, 60, 160, 255), outline=(255, 170, 220, 255), width=2)
     draw.ellipse([fx + 11, 11, fx + 21, 21], fill=(255, 230, 245, 255))
 
+    # 15. Healing Chamber (Green / Golden Sanctuary with Cross and Aura)
+    fx = 14 * 32
+    draw.rectangle([fx, 0, fx + 31, 31], fill=(20, 50, 35, 255))
+    draw.rectangle([fx + 2, 2, fx + 29, 29], fill=(30, 80, 55, 255))
+    draw.ellipse([fx + 4, 4, fx + 27, 27], fill=(40, 120, 75, 255), outline=(100, 255, 180, 255), width=2)
+    # Bright medical / healing cross
+    draw.rectangle([fx + 13, 8, fx + 18, 23], fill=(255, 255, 255, 255))
+    draw.rectangle([fx + 8, 13, fx + 23, 18], fill=(255, 255, 255, 255))
+    draw.rectangle([fx + 14, 9, fx + 17, 22], fill=(60, 240, 120, 255))
+    draw.rectangle([fx + 9, 14, fx + 22, 17], fill=(60, 240, 120, 255))
+
     img.save("assets/textures/tiles/tileset.png")
 
 def generate_ui_texture():

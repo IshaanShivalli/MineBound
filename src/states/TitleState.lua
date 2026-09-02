@@ -61,7 +61,7 @@ function TitleState:render()
     -- Subtitle
     love.graphics.setFont(gFonts['medium'])
     love.graphics.setColor(0.8, 0.9, 1, 1)
-    love.graphics.printf('2D Hero MOBA & Tile Mining Defense', 0, push:getHeight() / 2 - 45, push:getWidth(), 'center')
+    love.graphics.printf('Dual-World MOBA & Dimension-Shifting Defense', 0, push:getHeight() / 2 - 45, push:getWidth(), 'center')
 
     -- Animated Hero Sprite preview
     love.graphics.setColor(1, 1, 1, 1)
@@ -70,7 +70,7 @@ function TitleState:render()
     -- Instructions
     love.graphics.setFont(gFonts['small'])
     love.graphics.setColor(0.7, 0.75, 0.85, 1)
-    love.graphics.printf('WASD: Move | J / L-Click: Slash Attack | Space / K / R-Click: Mine & Build | 1/2: Select Defense', 0, push:getHeight() / 2 + 50, push:getWidth(), 'center')
+    love.graphics.printf('WASD: Move | J: Attack | Space: Mine & Build | Q / Shift: Realm Shift | 1/2/3/4: Build Structures', 0, push:getHeight() / 2 + 50, push:getWidth(), 'center')
 
     -- Start Prompt
     if self.showPrompt then

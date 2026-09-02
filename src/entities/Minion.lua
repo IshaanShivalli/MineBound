@@ -1,24 +1,32 @@
 Minion = Class{}
 
-function Minion:init(x, y, owner, targetCore)
+function Minion:init(x, y, owner, targetCore, dimension)
     self.x = x
     self.y = y
     self.size = 16
     self.owner = owner or 'player'
     self.targetCore = targetCore
-    self.speed = 45
-    self.maxHealth = 40
+    self.dimension = dimension or 'overworld' -- 'overworld' or 'nether'
+    self.speed = (self.dimension == 'nether') and 55 or 45
+    self.maxHealth = (self.dimension == 'nether') and 50 or 40
     self.health = self.maxHealth
-    self.attackPower = 8
+    self.attackPower = (self.dimension == 'nether') and 12 or 8
     self.attackTimer = 0
     self.attackInterval = 1.0
-    self.aggroRange = 60
+    self.aggroRange = 65
     self.attackRange = 18
 
-    local texture = self.owner == 'player' and gTextures['minion_player'] or gTextures['minion_enemy']
+    local texKey
+    if self.dimension == 'nether' then
+        texKey = (self.owner == 'player') and 'minion_void_player' or 'minion_void_enemy'
+    else
+        texKey = (self.owner == 'player') and 'minion_player' or 'minion_enemy'
+    end
+
+    local texture = gTextures[texKey]
     local g = anim8.newGrid(16, 16, texture:getWidth(), texture:getHeight())
     self.walkAnimation = anim8.newAnimation(g('1-2', 1), 0.2)
-    self.facing = self.owner == 'player' and 'right' or 'left'
+    self.facing = (self.owner == 'player') and 'right' or 'left'
 end
 
 function Minion:isAlive()
@@ -39,15 +47,15 @@ function Minion:update(dt, playState)
         self.attackTimer = self.attackTimer - dt
     end
 
-    -- Find target: enemy minions, enemy hero, or target core
+    -- Find target in same dimension: enemy minions, enemy hero, or target core / anchor
     local target = nil
     local targetX = self.targetCore.x + self.targetCore.size / 2
     local targetY = self.targetCore.y + self.targetCore.size / 2
     local closestDist = self.aggroRange
 
-    -- Check enemy minions
+    -- Check enemy minions in same dimension
     for _, other in ipairs(playState.minions) do
-        if other:isAlive() and other.owner ~= self.owner then
+        if other:isAlive() and other.dimension == self.dimension and other.owner ~= self.owner then
             local d = Distance(self.x, self.y, other.x, other.y)
             if d < closestDist then
                 closestDist = d
@@ -58,8 +66,8 @@ function Minion:update(dt, playState)
         end
     end
 
-    -- If enemy minion and player hero is near, target hero
-    if self.owner == 'enemy' and playState.hero:isAlive() then
+    -- If enemy minion and player hero is near in same dimension, target hero
+    if self.owner == 'enemy' and playState.hero:isAlive() and playState.hero.dimension == self.dimension then
         local d = Distance(self.x, self.y, playState.hero.x, playState.hero.y)
         if d < closestDist then
             target = playState.hero
@@ -68,10 +76,12 @@ function Minion:update(dt, playState)
         end
     end
 
-    -- If close to target core
-    local coreDist = Distance(self.x, self.y, self.targetCore.x + self.targetCore.size / 2, self.targetCore.y + self.targetCore.size / 2)
-    if not target and coreDist <= self.attackRange + self.targetCore.size / 2 then
-        target = self.targetCore
+    -- If in Overworld and close to target core
+    if self.dimension == 'overworld' then
+        local coreDist = Distance(self.x, self.y, self.targetCore.x + self.targetCore.size / 2, self.targetCore.y + self.targetCore.size / 2)
+        if not target and coreDist <= self.attackRange + self.targetCore.size / 2 then
+            target = self.targetCore
+        end
     end
 
     -- Attack or Move
@@ -82,7 +92,7 @@ function Minion:update(dt, playState)
         if self.attackTimer <= 0 then
             self.attackTimer = self.attackInterval
             target:takeDamage(self.attackPower)
-            playState:addSparks(self.x + self.size / 2, self.y + self.size / 2)
+            playState:addSparks(self.x + self.size / 2, self.y + self.size / 2, (self.dimension == 'nether') and {0.9, 0.4, 1} or {1, 0.8, 0.2})
             gSounds['hit']:stop()
             gSounds['hit']:play()
         end
@@ -109,7 +119,14 @@ function Minion:render()
     love.graphics.ellipse('fill', self.x + self.size / 2, self.y + self.size - 1, 6, 3)
 
     love.graphics.setColor(1, 1, 1, 1)
-    local texture = self.owner == 'player' and gTextures['minion_player'] or gTextures['minion_enemy']
+    local texKey
+    if self.dimension == 'nether' then
+        texKey = (self.owner == 'player') and 'minion_void_player' or 'minion_void_enemy'
+    else
+        texKey = (self.owner == 'player') and 'minion_player' or 'minion_enemy'
+    end
+
+    local texture = gTextures[texKey]
     local scaleX = (self.facing == 'left') and -1 or 1
 
     self.walkAnimation:draw(texture, self.x + (self.facing == 'left' and 16 or 0), self.y, 0, scaleX, 1)
@@ -118,7 +135,11 @@ function Minion:render()
     local hpPercent = self.health / self.maxHealth
     love.graphics.setColor(0.1, 0.1, 0.1, 0.8)
     love.graphics.rectangle('fill', self.x, self.y - 4, self.size, 2)
-    love.graphics.setColor(self.owner == 'player' and {0.2, 0.8, 0.2} or {0.9, 0.3, 0.3}, 0.9)
+    local col = (self.owner == 'player') and {0.2, 0.8, 0.2} or {0.9, 0.3, 0.3}
+    if self.dimension == 'nether' then
+        col = (self.owner == 'player') and {0.7, 0.3, 1.0} or {1.0, 0.3, 0.7}
+    end
+    love.graphics.setColor(col[1], col[2], col[3], 0.9)
     love.graphics.rectangle('fill', self.x, self.y - 4, self.size * hpPercent, 2)
     love.graphics.setColor(1, 1, 1, 1)
 end

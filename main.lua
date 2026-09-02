@@ -48,6 +48,8 @@ function love.load()
         ['hero'] = love.graphics.newImage('assets/textures/heroes/hero.png'),
         ['minion_player'] = love.graphics.newImage('assets/textures/heroes/minion_player.png'),
         ['minion_enemy'] = love.graphics.newImage('assets/textures/heroes/minion_enemy.png'),
+        ['minion_void_player'] = love.graphics.newImage('assets/textures/heroes/minion_void_player.png'),
+        ['minion_void_enemy'] = love.graphics.newImage('assets/textures/heroes/minion_void_enemy.png'),
         ['tileset'] = love.graphics.newImage('assets/textures/tiles/tileset.png'),
         ['ui'] = love.graphics.newImage('assets/textures/ui/ui.png'),
     }
@@ -57,6 +59,8 @@ function love.load()
         ['hero'] = GenerateQuads(gTextures['hero'], 24, 24),
         ['minion_player'] = GenerateQuads(gTextures['minion_player'], 16, 16),
         ['minion_enemy'] = GenerateQuads(gTextures['minion_enemy'], 16, 16),
+        ['minion_void_player'] = GenerateQuads(gTextures['minion_void_player'], 16, 16),
+        ['minion_void_enemy'] = GenerateQuads(gTextures['minion_void_enemy'], 16, 16),
         ['tiles'] = GenerateQuads(gTextures['tileset'], 32, 32),
         ['ui'] = GenerateQuads(gTextures['ui'], 16, 16),
     }
@@ -67,6 +71,7 @@ function love.load()
         ['mine'] = love.audio.newSource('assets/audio/sfx/mine.wav', 'static'),
         ['build'] = love.audio.newSource('assets/audio/sfx/build.wav', 'static'),
         ['shoot'] = love.audio.newSource('assets/audio/sfx/shoot.wav', 'static'),
+        ['shift'] = love.audio.newSource('assets/audio/sfx/shift.wav', 'static'),
         ['core_hit'] = love.audio.newSource('assets/audio/sfx/core_hit.wav', 'static'),
         ['victory'] = love.audio.newSource('assets/audio/sfx/victory.wav', 'static'),
         ['defeat'] = love.audio.newSource('assets/audio/sfx/defeat.wav', 'static'),
