@@ -46,6 +46,8 @@ function love.load()
     -- Load Textures
     gTextures = {
         ['hero'] = love.graphics.newImage('assets/textures/heroes/hero.png'),
+        ['enemy_champion'] = love.graphics.newImage('assets/textures/heroes/enemy_champion.png'),
+        ['boss_golem'] = love.graphics.newImage('assets/textures/heroes/boss_golem.png'),
         ['minion_player'] = love.graphics.newImage('assets/textures/heroes/minion_player.png'),
         ['minion_enemy'] = love.graphics.newImage('assets/textures/heroes/minion_enemy.png'),
         ['minion_void_player'] = love.graphics.newImage('assets/textures/heroes/minion_void_player.png'),
@@ -57,6 +59,8 @@ function love.load()
     -- Generate Quads
     gFrames = {
         ['hero'] = GenerateQuads(gTextures['hero'], 24, 24),
+        ['enemy_champion'] = GenerateQuads(gTextures['enemy_champion'], 24, 24),
+        ['boss_golem'] = GenerateQuads(gTextures['boss_golem'], 48, 48),
         ['minion_player'] = GenerateQuads(gTextures['minion_player'], 16, 16),
         ['minion_enemy'] = GenerateQuads(gTextures['minion_enemy'], 16, 16),
         ['minion_void_player'] = GenerateQuads(gTextures['minion_void_player'], 16, 16),
@@ -72,6 +76,10 @@ function love.load()
         ['build'] = love.audio.newSource('assets/audio/sfx/build.wav', 'static'),
         ['shoot'] = love.audio.newSource('assets/audio/sfx/shoot.wav', 'static'),
         ['shift'] = love.audio.newSource('assets/audio/sfx/shift.wav', 'static'),
+        ['dash'] = love.audio.newSource('assets/audio/sfx/dash.wav', 'static'),
+        ['ult'] = love.audio.newSource('assets/audio/sfx/ult.wav', 'static'),
+        ['upgrade'] = love.audio.newSource('assets/audio/sfx/upgrade.wav', 'static'),
+        ['storm'] = love.audio.newSource('assets/audio/sfx/storm.wav', 'static'),
         ['core_hit'] = love.audio.newSource('assets/audio/sfx/core_hit.wav', 'static'),
         ['victory'] = love.audio.newSource('assets/audio/sfx/victory.wav', 'static'),
         ['defeat'] = love.audio.newSource('assets/audio/sfx/defeat.wav', 'static'),
@@ -82,8 +90,11 @@ function love.load()
     gSounds['bgm']:setVolume(0.4)
     gSounds['bgm']:play()
 
+    local CutsceneState = require 'src.states.CutsceneState'
+
     gStateMachine = StateMachine {
         ['title'] = function() return TitleState() end,
+        ['cutscene'] = function() return CutsceneState() end,
         ['play'] = function() return PlayState() end,
         ['pause'] = function() return PauseState() end,
         ['gameover'] = function() return GameOverState() end,
