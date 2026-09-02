@@ -77,6 +77,74 @@ def generate_hero_texture():
 
     img.save("assets/textures/heroes/hero.png")
 
+def generate_enemy_champion_texture():
+    # 24x24 frames, 4 frames: Idle, Walk 1, Walk 2, Attack (Crimson / Obsidian Armored AI Champion)
+    img = Image.new("RGBA", (24 * 4, 24), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    skin = (210, 160, 130, 255)
+    armor_crimson = (180, 25, 45, 255)
+    armor_dark = (50, 10, 20, 255)
+    purple_glow = (210, 50, 230, 255)
+    steel_dark = (60, 60, 75, 255)
+    shadow = (0, 0, 0, 80)
+
+    def draw_base_champion(fx, leg_offset_left=0, leg_offset_right=0, sword_pos=0):
+        draw.ellipse([fx + 4, 20, fx + 20, 23], fill=shadow)
+        draw.rectangle([fx + 7, 16 + leg_offset_left, fx + 10, 21 + leg_offset_left], fill=armor_dark)
+        draw.rectangle([fx + 13, 16 + leg_offset_right, fx + 16, 21 + leg_offset_right], fill=armor_dark)
+        draw.rectangle([fx + 6, 8, fx + 17, 16], fill=armor_crimson)
+        draw.rectangle([fx + 9, 9, fx + 14, 15], fill=purple_glow)
+        draw.rectangle([fx + 7, 2, fx + 16, 8], fill=armor_dark)
+        draw.rectangle([fx + 8, 4, fx + 15, 7], fill=skin)
+        draw.point((fx + 10, 5), fill=(255, 30, 30, 255))
+        draw.point((fx + 13, 5), fill=(255, 30, 30, 255))
+        draw.rectangle([fx + 6, 1, fx + 17, 3], fill=purple_glow) # Horns/Crown
+        draw.rectangle([fx + 4, 9, fx + 6, 15], fill=armor_crimson)
+        draw.point((fx + 5, 12), fill=purple_glow)
+        
+        if sword_pos == 0:
+            draw.rectangle([fx + 17, 9, fx + 19, 14], fill=steel_dark)
+            draw.line([fx + 18, 5, fx + 18, 11], fill=purple_glow)
+        elif sword_pos == 1:
+            draw.rectangle([fx + 17, 10, fx + 19, 15], fill=steel_dark)
+            draw.line([fx + 18, 6, fx + 18, 12], fill=purple_glow)
+        elif sword_pos == 2:
+            draw.line([fx + 17, 10, fx + 23, 6], fill=(255, 80, 120, 255), width=2)
+            draw.arc([fx + 12, 1, fx + 23, 16], start=-45, end=90, fill=(255, 60, 180, 200))
+
+    draw_base_champion(0, 0, 0, 0)
+    draw_base_champion(24, -1, 1, 1)
+    draw_base_champion(48, 1, -1, 1)
+    draw_base_champion(72, 0, 0, 2)
+    img.save("assets/textures/heroes/enemy_champion.png")
+
+def generate_boss_texture():
+    # 48x48 frames, 2 frames: Idle, Attack (The Ancient Void Golem)
+    img = Image.new("RGBA", (48 * 2, 48), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    for f in range(2):
+        fx = f * 48
+        draw.ellipse([fx + 6, 40, fx + 42, 46], fill=(0, 0, 0, 90))
+        # Body / Torso
+        draw.rectangle([fx + 10, 14, fx + 38, 38], fill=(30, 15, 45, 255), outline=(130, 40, 220, 255), width=2)
+        # Core Eye
+        draw.ellipse([fx + 18, 20, fx + 30, 32], fill=(220, 60, 255, 255), outline=(255, 200, 255, 255))
+        draw.ellipse([fx + 22, 24, fx + 26, 28], fill=(255, 255, 255, 255))
+        # Shoulder Armor
+        draw.polygon([(fx + 4, 12), (fx + 12, 6), (fx + 14, 22)], fill=(70, 25, 100, 255))
+        draw.polygon([(fx + 44, 12), (fx + 36, 6), (fx + 34, 22)], fill=(70, 25, 100, 255))
+        # Fists / Arms
+        arm_y = 20 if f == 0 else 12
+        draw.rectangle([fx + 2, arm_y, fx + 10, arm_y + 18], fill=(50, 20, 75, 255), outline=(160, 50, 255, 255))
+        draw.rectangle([fx + 38, arm_y, fx + 46, arm_y + 18], fill=(50, 20, 75, 255), outline=(160, 50, 255, 255))
+        # Legs
+        draw.rectangle([fx + 12, 36, fx + 20, 43], fill=(20, 10, 30, 255))
+        draw.rectangle([fx + 28, 36, fx + 36, 43], fill=(20, 10, 30, 255))
+
+    img.save("assets/textures/heroes/boss_golem.png")
+
 def generate_minion_textures():
     for team, color, dark_color, fname in [
         ("player", (60, 130, 240, 255), (30, 70, 150, 255), "assets/textures/heroes/minion_player.png"),
@@ -414,13 +482,49 @@ def generate_audio():
             mel = (1.0 if math.sin(2 * math.pi * mel_freq * t) > 0 else -1.0) * 0.12 * mel_env
         hihat_env = max(0.0, 1.0 - ((beat * 2) % 1.0) * 5.0)
         noise = (((i * 48271) & 0x7FFF) / 0x3FFF - 1.0) * 0.05 * hihat_env
-        return bass + mel + noise
+    # 10. Dash SFX (Fast air rush)
+    def dash_gen(t, i, total):
+        env = max(0.0, 1.0 - (t / 0.18))
+        noise = (((i * 1664525 + 1013904223) & 0x7FFF) / 0x3FFF - 1.0) * 0.7
+        freq = 600.0 * (1.0 - t / 0.18) + 100.0
+        sine = math.sin(2 * math.pi * freq * t)
+        return (noise * 0.7 + sine * 0.4) * env
+    make_wav("assets/audio/sfx/dash.wav", 0.18, gen_func=dash_gen)
 
-    make_wav("assets/audio/music/bgm.wav", 8.0, gen_func=bgm_gen)
+    # 11. Ultimate Shockwave SFX (Thunderous bass blast + resonance)
+    def ult_gen(t, i, total):
+        env = max(0.0, 1.0 - (t / 0.6))
+        freq = 80.0 * (1.0 - t / 0.6) + 35.0
+        bass = math.sin(2 * math.pi * freq * t)
+        sub = math.sin(2 * math.pi * (freq * 0.5) * t) * 0.8
+        noise = (((i * 48271) & 0x7FFF) / 0x3FFF - 1.0) * 0.4
+        return (bass + sub + noise) * env * 0.95
+    make_wav("assets/audio/sfx/ult.wav", 0.6, gen_func=ult_gen)
+
+    # 12. Tech Shop Upgrade SFX (Chime arpeggio)
+    def upgrade_gen(t, i, total):
+        notes = [523.25, 659.25, 783.99, 1046.50]
+        seg = min(int(t / 0.08), len(notes) - 1)
+        freq = notes[seg]
+        env = max(0.0, 1.0 - (t / 0.35))
+        sine = math.sin(2 * math.pi * freq * t)
+        return sine * 0.3 * env
+    make_wav("assets/audio/sfx/upgrade.wav", 0.35, gen_func=upgrade_gen)
+
+    # 13. Storm Alert SFX (Rumble & high alert horn)
+    def storm_gen(t, i, total):
+        env = max(0.0, 1.0 - (t / 0.8))
+        freq = 440.0 if (int(t * 8) % 2 == 0) else 554.37
+        sine = math.sin(2 * math.pi * freq * t)
+        rumble = math.sin(2 * math.pi * 45.0 * t) * 0.6
+        return (sine * 0.3 + rumble) * env * 0.8
+    make_wav("assets/audio/sfx/storm.wav", 0.8, gen_func=storm_gen)
 
 if __name__ == "__main__":
     ensure_dirs()
     generate_hero_texture()
+    generate_enemy_champion_texture()
+    generate_boss_texture()
     generate_minion_textures()
     generate_tileset()
     generate_ui_texture()
