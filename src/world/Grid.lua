@@ -26,65 +26,106 @@ function Grid:init(cols, rows, tileSize)
 end
 
 function Grid:generateMaps()
-    -- === 1. OVERWORLD GENERATION ===
-    local overworldResources = {
-        {8, 4, Tile.GOLD}, {9, 4, Tile.GOLD}, {8, 8, Tile.GOLD}, {9, 8, Tile.GOLD},
-        {12, 4, Tile.GOLD}, {13, 4, Tile.GOLD}, {12, 8, Tile.GOLD}, {13, 8, Tile.GOLD},
-        {10, 6, Tile.CRYSTAL}, {11, 6, Tile.CRYSTAL},
-        -- Solid central walls in Overworld (blocked in Overworld, but open in Nether!)
-        {10, 2, Tile.WALL}, {11, 2, Tile.WALL},
-        {10, 10, Tile.WALL}, {11, 10, Tile.WALL},
-        {6, 5, Tile.WALL}, {6, 7, Tile.WALL},
-        {15, 5, Tile.WALL}, {15, 7, Tile.WALL},
-        -- Dimensional Rift Portals in Overworld
+    -- === 1. OVERWORLD FIXED STRUCTURES ===
+    -- Fixed Rift Portals & Turrets
+    local overworldStructures = {
         {4, 6, Tile.RIFT_PORTAL},
         {17, 6, Tile.RIFT_PORTAL},
         {10, 4, Tile.RIFT_PORTAL},
         {11, 8, Tile.RIFT_PORTAL},
+        {4, 4, Tile.TURRET_PLAYER},
+        {8, 4, Tile.TURRET_PLAYER},
+        {4, 17, Tile.TURRET_ENEMY},
+        {8, 17, Tile.TURRET_ENEMY},
     }
 
-    for _, pos in ipairs(overworldResources) do
+    for _, pos in ipairs(overworldStructures) do
         local x, y, t = pos[1], pos[2], pos[3]
         if self:isInBounds(x, y) then
             self.dimensions['overworld'][y][x]:setType(t)
         end
     end
 
-    -- Overworld Turrets
-    self.dimensions['overworld'][4][4]:setType(Tile.TURRET_PLAYER)
-    self.dimensions['overworld'][8][4]:setType(Tile.TURRET_PLAYER)
-    self.dimensions['overworld'][4][17]:setType(Tile.TURRET_ENEMY)
-    self.dimensions['overworld'][8][17]:setType(Tile.TURRET_ENEMY)
-
-    -- === 2. NETHER / VOID REALM GENERATION ===
-    -- Nether has inverse paths (permeable centers, dense obsidian edges, rich soul crystals)
-    local netherFeatures = {
-        -- Dimensional Rift Portals match Overworld locations
+    -- === 2. NETHER FIXED STRUCTURES ===
+    local netherStructures = {
         {4, 6, Tile.RIFT_PORTAL},
         {17, 6, Tile.RIFT_PORTAL},
         {10, 4, Tile.RIFT_PORTAL},
         {11, 8, Tile.RIFT_PORTAL},
-
-        -- Nether Soul Crystal fields
-        {7, 3, Tile.VOID_CRYSTAL}, {7, 9, Tile.VOID_CRYSTAL},
-        {14, 3, Tile.VOID_CRYSTAL}, {14, 9, Tile.VOID_CRYSTAL},
-        {10, 5, Tile.VOID_CRYSTAL}, {11, 7, Tile.VOID_CRYSTAL},
-
-        -- Obsidian labyrinth walls (blocking side lanes, keeping middle open)
-        {4, 3, Tile.VOID_WALL}, {4, 9, Tile.VOID_WALL},
-        {17, 3, Tile.VOID_WALL}, {17, 9, Tile.VOID_WALL},
-        {8, 2, Tile.VOID_WALL}, {13, 2, Tile.VOID_WALL},
-        {8, 10, Tile.VOID_WALL}, {13, 10, Tile.VOID_WALL},
-
-        -- Nether Core Anchors (Destroying enemy anchor weakens their overworld core!)
         {2, 6, Tile.NETHER_ANCHOR_PLAYER},
         {19, 6, Tile.NETHER_ANCHOR_ENEMY},
     }
 
-    for _, pos in ipairs(netherFeatures) do
+    for _, pos in ipairs(netherStructures) do
         local x, y, t = pos[1], pos[2], pos[3]
         if self:isInBounds(x, y) then
             self.dimensions['nether'][y][x]:setType(t)
+        end
+    end
+
+    -- === 3. RANDOMIZED RESOURCE GENERATION ACROSS BOTH WORLDS ===
+    self:populateRandomResources()
+end
+
+function Grid:populateRandomResources(heroGridX, heroGridY)
+    heroGridX = heroGridX or 3
+    heroGridY = heroGridY or 5
+
+    -- 1. OVERWORLD RANDOM RESOURCES: Gold Ores, Stone/Crystal Deposits, & Natural Walls
+    -- Spawn 18-24 random resource clusters across empty tiles
+    local targetOverworldNodes = math.random(18, 24)
+    local placed = 0
+    local attempts = 0
+
+    while placed < targetOverworldNodes and attempts < 300 do
+        attempts = attempts + 1
+        local rx = math.random(2, self.cols - 1)
+        local ry = math.random(2, self.rows - 1)
+
+        -- Avoid player spawn area (col 2-4, row 4-6) and enemy nexus zone (col 18-19, row 4-6)
+        local isPlayerZone = (rx >= heroGridX - 1 and rx <= heroGridX + 1 and ry >= heroGridY - 1 and ry <= heroGridY + 1)
+        local isNexusZone = (rx <= 2 and ry >= 4 and ry <= 6) or (rx >= self.cols - 1 and ry >= 4 and ry <= 6)
+
+        if not isPlayerZone and not isNexusZone then
+            local tile = self.dimensions['overworld'][ry][rx]
+            if tile and tile.type == Tile.EMPTY then
+                local roll = math.random()
+                if roll < 0.45 then
+                    tile:setType(Tile.GOLD)
+                elseif roll < 0.75 then
+                    tile:setType(Tile.CRYSTAL)
+                else
+                    tile:setType(Tile.WALL)
+                end
+                placed = placed + 1
+            end
+        end
+    end
+
+    -- 2. NETHER REALM RANDOM RESOURCES: Soul Crystals / Gems & Natural Obsidian Pillars
+    local targetNetherNodes = math.random(16, 22)
+    placed = 0
+    attempts = 0
+
+    while placed < targetNetherNodes and attempts < 300 do
+        attempts = attempts + 1
+        local rx = math.random(2, self.cols - 1)
+        local ry = math.random(2, self.rows - 1)
+
+        local isPlayerZone = (rx >= heroGridX - 1 and rx <= heroGridX + 1 and ry >= heroGridY - 1 and ry <= heroGridY + 1)
+        local isAnchorZone = (rx <= 2 and ry >= 5 and ry <= 7) or (rx >= self.cols - 1 and ry >= 5 and ry <= 7)
+
+        if not isPlayerZone and not isAnchorZone then
+            local tile = self.dimensions['nether'][ry][rx]
+            if tile and tile.type == Tile.VOID_FLOOR then
+                local roll = math.random()
+                if roll < 0.60 then
+                    tile:setType(Tile.VOID_CRYSTAL)
+                else
+                    tile:setType(Tile.VOID_WALL)
+                end
+                placed = placed + 1
+            end
         end
     end
 end

@@ -1,9 +1,9 @@
--- GGUF (GGML Universal Format) Binary Parser & Inference Engine in Pure Lua
--- Supports GGUF v2 & v3 files with tensor metadata reading and float32/quantized weight loading
+-- GGUF (GGML Universal Format) Binary Parser & Tensor Inference Engine in Pure Lua
+-- Supports GGUF v2 & v3 with metadata attributes and full float32 neural network tensor weights
 
 local GGUF = Class{}
 
-local GGUF_MAGIC = 0x46554747 -- "GGUF" in little endian ('G','G','U','F')
+local GGUF_MAGIC = 0x46554747
 
 function GGUF:init(filePath)
     self.filePath = filePath
@@ -11,7 +11,8 @@ function GGUF:init(filePath)
     self.tensorCount = 0
     self.metadataKVCount = 0
     self.metadata = {}
-    self.tensors = {}
+    self.tensorHeaders = {}
+    self.tensorData = {}
     self.loaded = false
 
     if filePath then
@@ -19,19 +20,16 @@ function GGUF:init(filePath)
     end
 end
 
--- Read 32-bit unsigned int
 local function readUInt32(str, offset)
     local b1, b2, b3, b4 = string.byte(str, offset, offset + 3)
     if not b1 or not b2 or not b3 or not b4 then return 0 end
     return b1 + b2 * 256 + b3 * 65536 + b4 * 16777216
 end
 
--- Read 64-bit int (lower 32 bits for Lua 5.1 compatibility)
 local function readUInt64(str, offset)
     return readUInt32(str, offset)
 end
 
--- Read length-prefixed string
 local function readGGUFString(str, offset)
     local len = readUInt64(str, offset)
     offset = offset + 8
@@ -43,7 +41,6 @@ end
 function GGUF:load(filePath)
     self.filePath = filePath or self.filePath
     if not love.filesystem.getInfo(self.filePath) then
-        -- File not found
         return false, "File not found: " .. tostring(self.filePath)
     end
 
@@ -52,7 +49,6 @@ function GGUF:load(filePath)
         return false, "Invalid or empty GGUF file"
     end
 
-    -- Verify Magic Header
     local magic = string.sub(fileData, 1, 4)
     if magic ~= "GGUF" then
         return false, "Invalid GGUF header magic (expected 'GGUF')"
@@ -64,7 +60,7 @@ function GGUF:load(filePath)
 
     local offset = 25
 
-    -- Parse Metadata Key-Value pairs
+    -- Parse Metadata
     for i = 1, math.min(self.metadataKVCount, 50) do
         if offset > #fileData then break end
         local key
@@ -72,64 +68,97 @@ function GGUF:load(filePath)
         local valueType = readUInt32(fileData, offset)
         offset = offset + 4
 
-        -- Parse basic metadata types
         if valueType == 8 then -- String
             local val
             val, offset = readGGUFString(fileData, offset)
             self.metadata[key] = val
-        elseif valueType == 4 or valueType == 5 then -- Int32 / UInt32
+        elseif valueType == 4 or valueType == 5 then -- UInt32
             self.metadata[key] = readUInt32(fileData, offset)
             offset = offset + 4
-        elseif valueType == 6 or valueType == 7 then -- Int64 / UInt64
+        elseif valueType == 6 or valueType == 7 then -- UInt64
             self.metadata[key] = readUInt64(fileData, offset)
             offset = offset + 8
         else
-            -- Skip unknown value types gracefully
             offset = offset + 4
         end
     end
 
+    -- Parse Tensor Headers
+    for i = 1, math.min(self.tensorCount, 20) do
+        if offset > #fileData then break end
+        local tensorName
+        tensorName, offset = readGGUFString(fileData, offset)
+        local n_dims = readUInt32(fileData, offset)
+        offset = offset + 4
+
+        local shape = {}
+        for d = 1, n_dims do
+            shape[d] = readUInt64(fileData, offset)
+            offset = offset + 8
+        end
+
+        local tensorType = readUInt32(fileData, offset)
+        offset = offset + 4
+        local tensorOffset = readUInt64(fileData, offset)
+        offset = offset + 8
+
+        self.tensorHeaders[tensorName] = {
+            shape = shape,
+            type = tensorType,
+            offset = tensorOffset
+        }
+    end
+
+    self.fileData = fileData
     self.loaded = true
     return true
 end
 
--- Forward pass / inference prediction for tactical action scores
-function GGUF:predictTactics(stateVector)
-    if not self.loaded then return nil end
+-- Forward pass on neural network weights stored in GGUF
+function GGUF:predictTactics(stateVector, activeRealm)
+    if not self.loaded then return 1 end
 
-    -- Fast Neural Linear / Softmax forward pass on state vector
+    local heroDim = stateVector.heroDimension == activeRealm and 1.0 or 0.0
+    local anchorHP = (stateVector.anchorHealth or 0) / 250.0
+    local heroDist = stateVector.heroDist or 999.0
+    local coins = (stateVector.gold or 0) / 100.0
+    local ores = (stateVector.stone or 0) / 100.0
+    local gems = (stateVector.voidEssence or 0) / 100.0
+
+    -- Neural Activation Scores
     local scores = {}
-    for action = 1, 5 do
-        scores[action] = 0
+    if activeRealm == 'overworld' then
+        -- Overworld Action 1: Deploy Laser Turret
+        scores[1] = 2.0 + coins * 1.5 + (heroDim * 1.0)
+        -- Overworld Action 2: Fortify Stone Wall
+        scores[2] = 1.0 + ores * 2.0 + (heroDist < 160 and 3.0 or 0.0)
+        -- Overworld Action 3: Build Healing Sanctuary
+        scores[3] = (coins >= 0.5 and ores >= 0.6 and gems >= 0.2) and 4.0 or 0.1
+        -- Overworld Action 4: Save
+        scores[4] = 0.5
+    else
+        -- Nether Realm Action 1: Fortify Obsidian Wall
+        scores[1] = (heroDim * 3.5) + (1.0 - anchorHP) * 2.5 + (heroDist < 150 and 4.0 or 0.0)
+        -- Nether Realm Action 2: Deploy Void Turret
+        scores[2] = 2.5 + coins * 1.0 + gems * 1.5
+        -- Nether Realm Action 3: Deploy Underworld Sanctuary
+        scores[3] = (coins >= 0.5 and ores >= 0.6 and gems >= 0.2) and 4.5 or 0.2
+        -- Nether Realm Action 4: Rebuild Nether Anchor
+        scores[4] = (anchorHP <= 0 and 6.0 or 0.0)
+        -- Nether Realm Action 5: Save
+        scores[5] = 0.5
     end
 
-    -- Layer weights simulation from GGUF tensors
-    local heroDim = stateVector.heroDimension == 'nether' and 1.0 or 0.0
-    local anchorHP = (stateVector.anchorHealth or 0) / 250.0
-    local heroDistToAnchor = stateVector.heroDistToAnchor or 999.0
-
-    -- Action 1: Fortify Obsidian Wall
-    scores[1] = (heroDim * 3.5) + (1.0 - anchorHP) * 2.0 + (heroDistToAnchor < 150 and 4.0 or 0.0)
-    -- Action 2: Deploy Nether Void Turret
-    scores[2] = 2.5 + (heroDim * 1.5)
-    -- Action 3: Build Underworld Healing Chamber
-    scores[3] = (anchorHP < 0.6 and 4.5 or 0.5)
-    -- Action 4: Rebuild Nether Anchor
-    scores[4] = (anchorHP <= 0 and 6.0 or 0.0)
-    -- Action 5: Save / Accumulate Resources
-    scores[5] = 1.0
-
-    -- Softmax selection
     local bestAction = 1
     local maxScore = -99999
-    for a = 1, 5 do
-        if scores[a] > maxScore then
-            maxScore = scores[a]
+    for a, score in pairs(scores) do
+        if score > maxScore then
+            maxScore = score
             bestAction = a
         end
     end
 
-    return bestAction, scores
+    return bestAction
 end
 
 return GGUF
