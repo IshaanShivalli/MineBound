@@ -115,7 +115,7 @@ def generate_minion_textures():
         img.save(fname)
 
 def generate_tileset():
-    # 14 tiles of 32x32:
+    # 15 tiles of 32x32:
     # 0: Grass Floor (Overworld)
     # 1: Stone Wall (Overworld)
     # 2: Gold Ore (Overworld)
@@ -130,7 +130,8 @@ def generate_tileset():
     # 11: Rift Portal (Dimensional Shift Gate)
     # 12: Player Nether Anchor / Siphon
     # 13: Enemy Nether Anchor / Siphon
-    img = Image.new("RGBA", (32 * 14, 32), (0, 0, 0, 0))
+    # 14: Healing Chamber Sanctuary
+    img = Image.new("RGBA", (32 * 15, 32), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     # 1. Grass / Arena Floor (Overworld)

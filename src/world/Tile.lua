@@ -226,7 +226,10 @@ function Tile:render(pixelX, pixelY, tileSize)
 
     -- Specific Tile Structure
     if self.type ~= Tile.EMPTY and self.type ~= Tile.VOID_FLOOR then
-        love.graphics.draw(gTextures['tileset'], gFrames['tiles'][self.type], pixelX, pixelY)
+        local quad = gFrames['tiles'][self.type]
+        if quad then
+            love.graphics.draw(gTextures['tileset'], quad, pixelX, pixelY)
+        end
 
         -- Healing Chamber Green Aura Pulse
         if self:isHealingChamber() then
