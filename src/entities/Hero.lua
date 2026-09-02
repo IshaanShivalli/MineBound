@@ -7,17 +7,42 @@ function Hero:init(x, y)
     self.y = y or 160
     self.width = 18
     self.height = 18
-    self.speed = 120
+    self.baseSpeed = 120
+    self.speed = self.baseSpeed
 
-    self.maxHealth = 100
+    self.baseMaxHealth = 100
+    self.maxHealth = self.baseMaxHealth
     self.health = self.maxHealth
     self.gold = 50
     self.stone = 30
     self.voidEssence = 20
 
+    self.baseAttackPower = 35
+    self.attackPower = self.baseAttackPower
+
     self.dimension = 'overworld' -- 'overworld' or 'nether'
     self.shiftCooldown = 0
     self.shiftCooldownMax = 1.0
+
+    -- Abilities Cooldowns
+    self.dashCooldown = 0
+    self.dashCooldownMax = 4.0
+    self.isDashing = false
+    self.dashTimer = 0
+
+    self.ultCooldown = 0
+    self.ultCooldownMax = 14.0
+
+    -- Buffs
+    self.voidFuryTimer = 0
+
+    -- Upgrades Purchased
+    self.upgrades = {
+        blades = 0,
+        boots = 0,
+        armor = 0,
+        turrets = 0
+    }
 
     self.direction = 'right'
     self.isMoving = false
@@ -45,6 +70,22 @@ end
 
 function Hero:isAlive()
     return self.health > 0
+end
+
+function Hero:applyUpgrade(upgradeType)
+    if upgradeType == 'blades' then
+        self.upgrades.blades = self.upgrades.blades + 1
+        self.attackPower = self.baseAttackPower + self.upgrades.blades * 12
+    elseif upgradeType == 'boots' then
+        self.upgrades.boots = self.upgrades.boots + 1
+        self.speed = self.baseSpeed + self.upgrades.boots * 22
+    elseif upgradeType == 'armor' then
+        self.upgrades.armor = self.upgrades.armor + 1
+        self.maxHealth = self.baseMaxHealth + self.upgrades.armor * 40
+        self.health = self.health + 40
+    elseif upgradeType == 'turrets' then
+        self.upgrades.turrets = self.upgrades.turrets + 1
+    end
 end
 
 function Hero:takeDamage(amount)
@@ -86,7 +127,6 @@ function Hero:shiftDimension(grid, playState)
 
     local targetDim = (self.dimension == 'overworld') and 'nether' or 'overworld'
     
-    -- Check if target dimension position is solid
     if self:collidesWithSolid(self.x, self.y, grid, targetDim) then
         playState:addFloatingText(self.x, self.y - 12, "Material Collision in " .. targetDim:upper() .. "!", {1, 0.4, 0.4}, self.dimension)
         return
@@ -102,6 +142,99 @@ function Hero:shiftDimension(grid, playState)
     local text = (self.dimension == 'nether') and ">> ENTERING NETHER REALM <<" or ">> RETURNING TO OVERWORLD <<"
     local col = (self.dimension == 'nether') and {0.9, 0.4, 1.0} or {0.4, 0.9, 1.0}
     playState:addFloatingText(self.x - 10, self.y - 16, text, col, self.dimension)
+end
+
+-- Ability 1: Void Dash (E Key)
+function Hero:castDash(grid, playState)
+    if self.dashCooldown > 0 or not self:isAlive() then return end
+
+    self.dashCooldown = self.dashCooldownMax
+    self.isDashing = true
+    self.dashTimer = 0.18
+    self.invulnerable = true
+    self.invulnTimer = 0.35
+
+    gSounds['dash']:stop()
+    gSounds['dash']:play()
+
+    local dashDist = 70
+    local dx = (self.direction == 'left' and -dashDist) or (self.direction == 'right' and dashDist) or 0
+    local dy = (self.direction == 'up' and -dashDist) or (self.direction == 'down' and dashDist) or 0
+
+    -- Test intermediate steps for collision
+    local targetX = self.x + dx
+    local targetY = self.y + dy
+
+    if not self:collidesWithSolid(targetX, targetY, grid, self.dimension) then
+        self.x = targetX
+        self.y = targetY
+    end
+
+    playState:triggerScreenShake(3, 0.15)
+    playState:addSparks(self.x + 9, self.y + 9, {0.9, 0.3, 1.0}, self.dimension)
+    playState:addFloatingText(self.x, self.y - 14, "VOID DASH!", {0.9, 0.4, 1.0}, self.dimension)
+end
+
+-- Ability 2: Dimensional Shockwave Ultimate (R Key)
+function Hero:castUltimate(grid, playState)
+    if self.ultCooldown > 0 or not self:isAlive() then return end
+
+    self.ultCooldown = self.ultCooldownMax
+    gSounds['ult']:stop()
+    gSounds['ult']:play()
+
+    playState:triggerScreenShake(8, 0.45)
+
+    local cx = self.x + self.width / 2
+    local cy = self.y + self.height / 2
+    local blastRadius = 90
+    local ultDmg = 80 + (self.voidFuryTimer > 0 and 40 or 0)
+
+    -- Primary Realm Blast
+    playState:addSlashEffect(cx, cy, self.dimension)
+    playState:addSparks(cx, cy, {1.0, 0.8, 0.2}, self.dimension)
+
+    for _, minion in ipairs(playState.minions) do
+        if minion:isAlive() and minion.owner == 'enemy' and minion.dimension == self.dimension then
+            local d = Distance(cx, cy, minion.x + minion.size / 2, minion.y + minion.size / 2)
+            if d <= blastRadius then
+                minion:takeDamage(ultDmg)
+                playState:addFloatingText(minion.x, minion.y - 8, "-" .. ultDmg .. " CRIT!", {1, 0.2, 0.2}, self.dimension)
+            end
+        end
+    end
+
+    -- Damage Enemy Champion if in range
+    if playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == self.dimension then
+        local d = Distance(cx, cy, playState.enemyHero.x + 9, playState.enemyHero.y + 9)
+        if d <= blastRadius then
+            playState.enemyHero:takeDamage(ultDmg)
+            playState:addFloatingText(playState.enemyHero.x, playState.enemyHero.y - 12, "-" .. ultDmg .. " ULT!", {1, 0.2, 0.2}, self.dimension)
+        end
+    end
+
+    -- Damage Boss if in range
+    if playState.boss and playState.boss:isAlive() and self.dimension == 'nether' then
+        local d = Distance(cx, cy, playState.boss.x + 24, playState.boss.y + 24)
+        if d <= blastRadius + 24 then
+            playState.boss:takeDamage(ultDmg, self)
+        end
+    end
+
+    -- Cross-Dimensional Echo: Pulses 50% damage through into the other realm!
+    local otherDim = (self.dimension == 'overworld') and 'nether' or 'overworld'
+    playState:addSparks(cx, cy, {0.9, 0.3, 1.0}, otherDim)
+    for _, minion in ipairs(playState.minions) do
+        if minion:isAlive() and minion.owner == 'enemy' and minion.dimension == otherDim then
+            local d = Distance(cx, cy, minion.x + minion.size / 2, minion.y + minion.size / 2)
+            if d <= blastRadius then
+                minion:takeDamage(math.floor(ultDmg * 0.5))
+                playState:addFloatingText(minion.x, minion.y - 8, "-" .. math.floor(ultDmg * 0.5) .. " ECHO!", {0.9, 0.4, 1.0}, otherDim)
+            end
+        end
+    end
+
+    playState:addFloatingText(self.x - 20, self.y - 18, "DIMENSIONAL SHOCKWAVE!", {1.0, 0.85, 0.2}, self.dimension)
 end
 
 function Hero:update(dt, grid, playState)
@@ -121,6 +254,18 @@ function Hero:update(dt, grid, playState)
 
     if self.shiftCooldown > 0 then
         self.shiftCooldown = self.shiftCooldown - dt
+    end
+
+    if self.dashCooldown > 0 then
+        self.dashCooldown = self.dashCooldown - dt
+    end
+
+    if self.ultCooldown > 0 then
+        self.ultCooldown = self.ultCooldown - dt
+    end
+
+    if self.voidFuryTimer > 0 then
+        self.voidFuryTimer = self.voidFuryTimer - dt
     end
 
     if self.invulnerable then
@@ -154,28 +299,25 @@ function Hero:update(dt, grid, playState)
     self.isMoving = (dx ~= 0 or dy ~= 0)
 
     if self.isMoving then
+        local currentSpd = self.speed * (self.voidFuryTimer > 0 and 1.25 or 1.0)
         local len = math.sqrt(dx * dx + dy * dy)
-        dx = (dx / len) * self.speed * dt
-        dy = (dy / len) * self.speed * dt
+        dx = (dx / len) * currentSpd * dt
+        dy = (dy / len) * currentSpd * dt
 
-        -- Move X with collision in current dimension
         local nextX = self.x + dx
         if not self:collidesWithSolid(nextX, self.y, grid, self.dimension) then
             self.x = nextX
         end
 
-        -- Move Y with collision in current dimension
         local nextY = self.y + dy
         if not self:collidesWithSolid(self.x, nextY, grid, self.dimension) then
             self.y = nextY
         end
 
-        -- Keep within virtual screen bounds
         self.x = math.clamp(self.x, 0, push:getWidth() - self.width)
         self.y = math.clamp(self.y, 0, push:getHeight() - self.height)
     end
 
-    -- Check if standing on a Rift Portal
     local gx, gy = self:getGridPosition(grid)
     local curTile = grid:getTile(gx, gy, self.dimension)
     if curTile and curTile.type == Tile.RIFT_PORTAL and self.shiftCooldown <= 0 then
@@ -184,7 +326,6 @@ function Hero:update(dt, grid, playState)
         playState.riftNearby = false
     end
 
-    -- Update animation
     if self.isAttacking then
         self.currentAnimation = self.animations['attack']
     elseif self.isMoving then
@@ -216,7 +357,6 @@ function Hero:collidesWithSolid(x, y, grid, dimension)
     return false
 end
 
--- Checks if placing a solid structure at (gx, gy) would intersect hero bounding box
 function Hero:isIntersectingTile(gx, gy)
     local tileLeft = (gx - 1) * 32
     local tileRight = gx * 32
@@ -247,15 +387,33 @@ function Hero:attack(playState)
     gSounds['hit']:play()
 
     local hitRadius = 32
+    local currentDmg = self.attackPower * (self.voidFuryTimer > 0 and 1.5 or 1.0)
 
-    -- Damage nearby enemy minions in same dimension
+    -- Damage nearby enemy minions
     for _, minion in ipairs(playState.minions) do
         if minion:isAlive() and minion.owner == 'enemy' and minion.dimension == self.dimension then
             local d = Distance(slashX, slashY, minion.x + minion.size / 2, minion.y + minion.size / 2)
             if d <= hitRadius then
-                minion:takeDamage(35)
-                playState:addFloatingText(minion.x, minion.y - 4, "-35", {1, 0.3, 0.3}, self.dimension)
+                minion:takeDamage(currentDmg)
+                playState:addFloatingText(minion.x, minion.y - 4, "-" .. math.floor(currentDmg), {1, 0.3, 0.3}, self.dimension)
             end
+        end
+    end
+
+    -- Damage Enemy Champion
+    if playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == self.dimension then
+        local d = Distance(slashX, slashY, playState.enemyHero.x + 9, playState.enemyHero.y + 9)
+        if d <= hitRadius + 9 then
+            playState.enemyHero:takeDamage(currentDmg)
+            playState:addFloatingText(playState.enemyHero.x, playState.enemyHero.y - 10, "-" .. math.floor(currentDmg), {1, 0.2, 0.2}, self.dimension)
+        end
+    end
+
+    -- Damage Void Golem Boss
+    if playState.boss and playState.boss:isAlive() and self.dimension == 'nether' then
+        local d = Distance(slashX, slashY, playState.boss.x + 24, playState.boss.y + 24)
+        if d <= hitRadius + 24 then
+            playState.boss:takeDamage(currentDmg, self)
         end
     end
 
@@ -264,7 +422,7 @@ function Hero:attack(playState)
         local dCore = Distance(slashX, slashY, playState.enemyCore.x + playState.enemyCore.size / 2, playState.enemyCore.y + playState.enemyCore.size / 2)
         if dCore <= hitRadius + playState.enemyCore.size / 2 then
             local enemyAnchor = playState.grid:getAnchor('nether', 'enemy')
-            local dmg = enemyAnchor and 15 or 30
+            local dmg = enemyAnchor and math.floor(currentDmg * 0.5) or currentDmg
             playState.enemyCore:takeDamage(dmg)
             if enemyAnchor then
                 playState:addFloatingText(playState.enemyCore.x, playState.enemyCore.y - 8, "-" .. dmg .. " (Shielded!)", {0.8, 0.5, 1}, 'overworld')
@@ -273,12 +431,12 @@ function Hero:attack(playState)
             end
         end
     else
-        -- In Nether: Damage Enemy Nether Anchor if in range
+        -- In Nether: Damage Enemy Nether Anchor
         local gx, gy = playState.grid:worldToGrid(slashX, slashY)
         local tile = playState.grid:getTile(gx, gy, 'nether')
         if tile and tile.type == Tile.NETHER_ANCHOR_ENEMY then
-            tile:takeDamage(35)
-            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "-35 Anchor", {1, 0.4, 0.8}, 'nether')
+            tile:takeDamage(currentDmg)
+            playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "-" .. math.floor(currentDmg) .. " Anchor", {1, 0.4, 0.8}, 'nether')
             playState:addSparks((gx - 0.5) * 32, (gy - 0.5) * 32, {1, 0.3, 0.8}, 'nether')
         end
     end
@@ -293,7 +451,6 @@ function Hero:mineOrBuild(grid, playState)
     if not tile then return end
 
     if tile:isSolid() then
-        -- Mining in current dimension
         local dropType, dropAmount = grid:mineTile(gx, gy, 35, self.dimension)
         gSounds['mine']:stop()
         gSounds['mine']:play()
@@ -310,13 +467,11 @@ function Hero:mineOrBuild(grid, playState)
             playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "+" .. dropAmount .. " Gems", {0.9, 0.4, 1.0}, self.dimension)
         end
     else
-        -- ANTI-STICKING CHECK: Prevent hero from placing a solid block directly inside their own body hitbox
         if self:isIntersectingTile(gx, gy) then
             playState:addFloatingText(self.x, self.y - 12, "Step away to build!", {1, 0.5, 0.2}, self.dimension)
             return
         end
 
-        -- Building in current dimension
         if self.buildSelection == 'wall' then
             if self.stone >= 5 then
                 self.stone = self.stone - 5
@@ -351,7 +506,6 @@ function Hero:mineOrBuild(grid, playState)
                 playState:addFloatingText(self.x, self.y - 12, "Need 30 Gems, 20 Coins!", {1, 0.4, 0.4}, self.dimension)
             end
         elseif self.buildSelection == 'healer' then
-            -- Healing Chamber: 50 coins, 60 ores, 20 gems
             if self.gold >= 50 and self.stone >= 60 and self.voidEssence >= 20 then
                 self.gold = self.gold - 50
                 self.stone = self.stone - 60
@@ -373,6 +527,13 @@ function Hero:render()
     -- Draw shadow
     love.graphics.setColor(0, 0, 0, 0.4)
     love.graphics.ellipse('fill', self.x + self.width / 2, self.y + self.height - 2, 8, 4)
+
+    -- Void Fury Golden/Purple Aura
+    if self.voidFuryTimer > 0 then
+        local pulse = (math.sin(love.timer.getTime() * 10) + 1) * 0.5
+        love.graphics.setColor(1.0, 0.8, 0.2, 0.35 + pulse * 0.25)
+        love.graphics.circle('line', self.x + self.width / 2, self.y + self.height / 2, 16 + pulse * 3)
+    end
 
     -- Dimension aura / tint
     if self.dimension == 'nether' then

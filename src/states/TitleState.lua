@@ -31,7 +31,7 @@ end
 function TitleState:keypressed(key)
     if key == 'return' or key == 'kpenter' or key == 'space' then
         gSounds['mine']:play()
-        gStateMachine:change('play')
+        gStateMachine:change('cutscene')
     elseif key == 'escape' then
         love.event.quit()
     end
