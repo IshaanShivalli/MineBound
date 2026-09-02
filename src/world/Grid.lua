@@ -37,10 +37,7 @@ function Grid:generateMaps()
         {4, 8, Tile.TURRET_PLAYER},
         {8, 4, Tile.TURRET_PLAYER},
         {8, 8, Tile.TURRET_PLAYER},
-        {13, 4, Tile.TURRET_ENEMY},
-        {13, 8, Tile.TURRET_ENEMY},
-        {17, 4, Tile.TURRET_ENEMY},
-        {17, 8, Tile.TURRET_ENEMY},
+        -- Enemy turrets are spawned after a grace period by PlayState
     }
 
     for _, pos in ipairs(overworldStructures) do
