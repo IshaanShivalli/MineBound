@@ -1,7 +1,0 @@
-Task : Add textures for pets.
-
-Context : 
-- The shed cannot even be placed after destroying 2 towers and soloed enemy hero
-- The pet textures should be generated in generate_assets.py
-- Also as soon as the player starts a fight there is this red orb flying and sticking to one of the player's turrets
-- Make sure that the pets are running on the python model
