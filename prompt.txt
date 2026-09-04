@@ -1,17 +1,7 @@
-Task : To imporve the game feeling
+Task : Add textures for pets.
 
 Context : 
-- make the player get only 4 chances to shift between dimensions and not more than that.
-- add moving cut scenes
-- make the boss in the other realm spawn only after every 2 wars in both the worlds
-- Add pets to the player which have some features like slowing down turrets, giving the slowest poison effects, damages thing which the player targets.
-- Also make the Shielded base to work in such a way that if the shield of the structure is destroyed then the base should damage the player attacking them even the pets.
-- In the other dimension the pets will not work but the oponents will have pets.
-- To get pets the player should build the 'shed' wherein they can get their pets.
-- The pets will take time for training in the shed.
-- To make a shed the player should first destory 2 enemy turrets and kill the enemy hero alone without turrets or minions help
-
-
-Also the pet will have their own trained model from the notebook.
-
-Note : move all python code to assets/ the notebooks to notebook/. Make a new notebook to make the pets run on the AI model trained in colab.
+- The shed cannot even be placed after destroying 2 towers and soloed enemy hero
+- The pet textures should be generated in generate_assets.py
+- Also as soon as the player starts a fight there is this red orb flying and sticking to one of the player's turrets
+- Make sure that the pets are running on the python model

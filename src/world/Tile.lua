@@ -94,10 +94,23 @@ function Tile:setType(tileType)
     self.healTimer = 0
 end
 
-function Tile:takeDamage(amount)
+function Tile:takeDamage(amount, playState)
     if self.type == Tile.RIFT_PORTAL then return false end
+    local wasEnemyTurret = (self.type == Tile.TURRET_ENEMY)
     self.health = math.clamp(self.health - amount, 0, self.maxHealth)
-    return self.health <= 0
+    local destroyed = (self.health <= 0)
+
+    if destroyed and wasEnemyTurret and playState then
+        playState.turretsDestroyedByPlayer = playState.turretsDestroyedByPlayer + 1
+        if playState.turretsDestroyedByPlayer >= 2 and playState.soloHeroKillAchieved and not playState.shedUnlocked then
+            playState.shedUnlocked = true
+            playState:addFloatingText((self.gridX - 0.5) * 32, (self.gridY - 0.5) * 32, "PET SHED UNLOCKED!", {0.4, 0.9, 0.3}, self.dimension)
+        else
+            playState:addFloatingText((self.gridX - 0.5) * 32, (self.gridY - 0.5) * 32, "TURRET DESTROYED! (" .. playState.turretsDestroyedByPlayer .. "/2)", {1, 0.8, 0.2}, self.dimension)
+        end
+    end
+
+    return destroyed
 end
 
 function Tile:update(dt, playState)

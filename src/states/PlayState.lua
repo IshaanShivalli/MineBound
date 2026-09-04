@@ -41,9 +41,6 @@ function PlayState:init()
     self.completedWarsCount = 0
     self.bossSpawnWarInterval = 2
 
-    -- Automatically spawn enemy pet so opponents have pets as specified
-    table.insert(self.pets, Pet('enemy', TILE_SIZE * 17, TILE_SIZE * 5))
-
     -- Visual Effects (dimension-tagged)
     self.floatingTexts = {}
     self.sparks = {}
@@ -704,9 +701,17 @@ function PlayState:renderHUD()
     love.graphics.setColor(ultReady and {1.0, 0.85, 0.2} or {0.4, 0.4, 0.4})
     love.graphics.print("[R] Ult " .. (ultReady and "READY" or string.format("%.1fs", self.hero.ultCooldown)), 440, 6)
 
-    -- Tech Shop Prompt
-    love.graphics.setColor(0.3, 1.0, 0.6, 1)
-    love.graphics.print("[B] Shop", 510, 6)
+    -- Shed Unlock Progress Indicator
+    love.graphics.setFont(gFonts['small'])
+    if self.shedUnlocked then
+        love.graphics.setColor(0.3, 0.9, 0.4, 0.9)
+        love.graphics.print("[Shed: UNLOCKED]", 540, 6)
+    else
+        local tCount = math.min(2, self.turretsDestroyedByPlayer or 0)
+        local soloStr = self.soloHeroKillAchieved and "Solo: OK" or "Solo: NO"
+        love.graphics.setColor(1, 0.7, 0.3, 0.9)
+        love.graphics.print(string.format("[Shed: Turrets %d/2, %s]", tCount, soloStr), 490, 6)
+    end
 
     -- Bottom Controls Hint Bar
     love.graphics.setColor(0.04, 0.06, 0.1, 0.8)
@@ -715,7 +720,7 @@ function PlayState:renderHUD()
     love.graphics.setFont(gFonts['small'])
     local shiftPrompt = (self.hero.shiftCooldown <= 0 and shiftsLeft > 0) and ('Q: Shift (' .. shiftsLeft .. '/4)') or 'Q: Locked'
     local buildModeStr = '1: Wall | 2: Turret | 3: Anchor | 4: Healer | 5: Shed'
-    love.graphics.print('WASD: Move | J: Attack | E: Dash | R: Ult | Space: Mine/Build | ' .. shiftPrompt .. ' | ' .. buildModeStr .. ' | B: Shop', 4, push:getHeight() - 13)
+    love.graphics.print('WASD: Move | J: Attack | E: Dash | R: Ult | Space: Mine/Build | ' .. shiftPrompt .. ' | ' .. buildModeStr, 4, push:getHeight() - 13)
     love.graphics.setColor(1, 1, 1, 1)
 end
 

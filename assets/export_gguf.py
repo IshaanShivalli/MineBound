@@ -93,5 +93,9 @@ def create_minebound_gguf(output_path="assets/models/enemy_ai_model.gguf"):
     file_size_kb = os.path.getsize(output_path) / 1024.0
     print(f"Generated standalone full-weight GGUF model ({file_size_kb:.2f} KB) at: {output_path}")
 
+def create_pet_gguf(output_path="assets/models/pet_ai_model.gguf"):
+    create_minebound_gguf(output_path)
+
 if __name__ == "__main__":
     create_minebound_gguf()
+    create_pet_gguf()

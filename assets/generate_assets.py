@@ -182,6 +182,40 @@ def generate_minion_textures():
             
         img.save(fname)
 
+def generate_pet_textures():
+    # 16x16 frames, 2 frames: Idle, Action (Cute creature sprite with ears, eyes, and glowing orb)
+    for team, color, dark_color, fname in [
+        ("player", (60, 220, 110, 255), (20, 120, 50, 255), "assets/textures/heroes/pet_player.png"),
+        ("enemy", (230, 70, 70, 255), (140, 30, 30, 255), "assets/textures/heroes/pet_enemy.png")
+    ]:
+        img = Image.new("RGBA", (16 * 2, 16), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        
+        for f in range(2):
+            fx = f * 16
+            # Shadow
+            draw.ellipse([fx + 3, 12, fx + 13, 15], fill=(0, 0, 0, 60))
+            
+            # Ears
+            draw.polygon([(fx + 3, 4), (fx + 5, 1), (fx + 6, 5)], fill=dark_color)
+            draw.polygon([(fx + 10, 5), (fx + 11, 1), (fx + 13, 4)], fill=dark_color)
+            
+            # Body (Cute rounded creature)
+            draw.ellipse([fx + 3, 4 + (1 if f == 1 else 0), fx + 13, 14], fill=color)
+            draw.ellipse([fx + 4, 5 + (1 if f == 1 else 0), fx + 12, 13], outline=dark_color, width=1)
+            
+            # Big Eyes
+            draw.ellipse([fx + 5, 7, fx + 7, 9], fill=(255, 255, 255, 255))
+            draw.ellipse([fx + 9, 7, fx + 11, 9], fill=(255, 255, 255, 255))
+            draw.point((fx + 6, 8), fill=(20, 20, 20, 255))
+            draw.point((fx + 10, 8), fill=(20, 20, 20, 255))
+            
+            # Glowing aura gem on forehead
+            gem_col = (100, 255, 240, 255) if team == "player" else (255, 200, 50, 255)
+            draw.rectangle([fx + 7, 4, fx + 8, 5], fill=gem_col)
+
+        img.save(fname)
+
 def generate_tileset():
     # 15 tiles of 32x32:
     # 0: Grass Floor (Overworld)
@@ -526,6 +560,7 @@ if __name__ == "__main__":
     generate_enemy_champion_texture()
     generate_boss_texture()
     generate_minion_textures()
+    generate_pet_textures()
     generate_tileset()
     generate_ui_texture()
     generate_audio()

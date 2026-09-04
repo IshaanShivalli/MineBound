@@ -177,18 +177,8 @@ function Grid:mineTile(gridX, gridY, damage, dimension)
         dropAmount = 15
     end
 
-    local wasEnemyTurret = (tile.type == Tile.TURRET_ENEMY)
-
-    local destroyed = tile:takeDamage(damage or 25)
+    local destroyed = tile:takeDamage(damage or 25, playState)
     if destroyed then
-        if wasEnemyTurret and playState then
-            playState.turretsDestroyedByPlayer = playState.turretsDestroyedByPlayer + 1
-            if playState.turretsDestroyedByPlayer >= 2 and playState.soloHeroKillAchieved and not playState.shedUnlocked then
-                playState.shedUnlocked = true
-                playState:addFloatingText((gridX - 0.5) * 32, (gridY - 0.5) * 32, "PET SHED UNLOCKED!", {0.4, 0.9, 0.3}, dimension)
-            end
-        end
-
         local emptyType = (dimension == 'nether') and Tile.VOID_FLOOR or Tile.EMPTY
         tile:setType(emptyType)
         return dropType, dropAmount

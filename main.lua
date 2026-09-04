@@ -52,6 +52,8 @@ function love.load()
         ['minion_enemy'] = love.graphics.newImage('assets/textures/heroes/minion_enemy.png'),
         ['minion_void_player'] = love.graphics.newImage('assets/textures/heroes/minion_void_player.png'),
         ['minion_void_enemy'] = love.graphics.newImage('assets/textures/heroes/minion_void_enemy.png'),
+        ['pet_player'] = love.graphics.newImage('assets/textures/heroes/pet_player.png'),
+        ['pet_enemy'] = love.graphics.newImage('assets/textures/heroes/pet_enemy.png'),
         ['tileset'] = love.graphics.newImage('assets/textures/tiles/tileset.png'),
         ['ui'] = love.graphics.newImage('assets/textures/ui/ui.png'),
     }
@@ -65,6 +67,8 @@ function love.load()
         ['minion_enemy'] = GenerateQuads(gTextures['minion_enemy'], 16, 16),
         ['minion_void_player'] = GenerateQuads(gTextures['minion_void_player'], 16, 16),
         ['minion_void_enemy'] = GenerateQuads(gTextures['minion_void_enemy'], 16, 16),
+        ['pet_player'] = GenerateQuads(gTextures['pet_player'], 16, 16),
+        ['pet_enemy'] = GenerateQuads(gTextures['pet_enemy'], 16, 16),
         ['tiles'] = GenerateQuads(gTextures['tileset'], 32, 32),
         ['ui'] = GenerateQuads(gTextures['ui'], 16, 16),
     }

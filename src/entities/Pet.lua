@@ -1,4 +1,5 @@
 local Tile = require 'src.world.Tile'
+local GGUF = require 'lib.GGUF'
 
 Pet = Class{}
 
@@ -15,6 +16,11 @@ function Pet:init(owner, x, y)
     self.poisonCooldownMax = 2.0
     self.slowCooldown = 0
     self.slowCooldownMax = 3.0
+    
+    -- Load Pet AI Model trained from notebook
+    self.modelPath = 'assets/models/pet_ai_model.gguf'
+    self.ggufModel = GGUF(self.modelPath)
+    self.isModelActive = self.ggufModel and self.ggufModel.loaded
     
     -- Visual animation framing / color
     self.color = (self.owner == 'player') and {0.3, 0.9, 0.4} or {0.9, 0.3, 0.3}
@@ -124,18 +130,19 @@ function Pet:render(playState)
         return
     end
 
-    -- Draw Pet Spirit Orb / Companion
-    local pulse = (math.sin(love.timer.getTime() * 8) + 1) * 0.5
-    love.graphics.setColor(self.color[1], self.color[2], self.color[3], 0.85)
-    love.graphics.circle('fill', self.x + 7, self.y + 7, 6 + pulse * 2)
-    
-    love.graphics.setColor(1, 1, 1, 0.9)
-    love.graphics.circle('fill', self.x + 5, self.y + 5, 2)
-
-    love.graphics.setColor(self.color[1], self.color[2], self.color[3], 0.3)
-    love.graphics.circle('line', self.x + 7, self.y + 7, 9 + pulse * 2)
-    
-    love.graphics.setColor(1, 1, 1, 1)
+    -- Draw Pet Texture Sprite from generate_assets.py
+    local frameIndex = (math.floor(love.timer.getTime() * 4) % 2) + 1
+    local texKey = 'pet_' .. self.owner
+    if gTextures[texKey] and gFrames[texKey] then
+        love.graphics.setColor(1, 1, 1, 1)
+        love.graphics.draw(gTextures[texKey], gFrames[texKey][frameIndex], self.x - 1, self.y - 1)
+    else
+        -- Fallback Spirit Orb
+        local pulse = (math.sin(love.timer.getTime() * 8) + 1) * 0.5
+        love.graphics.setColor(self.color[1], self.color[2], self.color[3], 0.85)
+        love.graphics.circle('fill', self.x + 7, self.y + 7, 6 + pulse * 2)
+        love.graphics.setColor(1, 1, 1, 1)
+    end
 end
 
 return Pet
