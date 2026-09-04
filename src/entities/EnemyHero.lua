@@ -36,7 +36,7 @@ function EnemyHero:isAlive()
     return self.health > 0
 end
 
-function EnemyHero:takeDamage(amount)
+function EnemyHero:takeDamage(amount, playState)
     if self.invulnerable or not self:isAlive() then return end
 
     self.health = math.clamp(self.health - amount, 0, self.maxHealth)
@@ -45,6 +45,26 @@ function EnemyHero:takeDamage(amount)
 
     if self.health <= 0 then
         self.respawnTimer = 15.0 -- 15s respawn timer
+
+        -- Check if killed solo by player without player minions or turrets helping
+        if playState then
+            local alone = true
+            for _, minion in ipairs(playState.minions) do
+                if minion:isAlive() and minion.owner == 'player' and minion.dimension == self.dimension then
+                    local d = Distance(self.x, self.y, minion.x, minion.y)
+                    if d < 150 then alone = false; break end
+                end
+            end
+            if alone then
+                playState.soloHeroKillAchieved = true
+                if playState.turretsDestroyedByPlayer >= 2 and not playState.shedUnlocked then
+                    playState.shedUnlocked = true
+                    playState:addFloatingText(self.x, self.y - 14, "SOLO HERO KILL! PET SHED UNLOCKED!", {0.4, 0.9, 0.3}, self.dimension)
+                else
+                    playState:addFloatingText(self.x, self.y - 14, "SOLO HERO KILL ACHIEVED!", {0.4, 0.9, 0.3}, self.dimension)
+                end
+            end
+        end
     end
 end
 

@@ -23,6 +23,7 @@ function Hero:init(x, y)
     self.dimension = 'overworld' -- 'overworld' or 'nether'
     self.shiftCooldown = 0
     self.shiftCooldownMax = 1.0
+    self.dimensionShiftsRemaining = 4 -- Capped at 4 shift chances per match
 
     -- Abilities Cooldowns
     self.dashCooldown = 0
@@ -125,6 +126,11 @@ end
 function Hero:shiftDimension(grid, playState)
     if self.shiftCooldown > 0 or not self:isAlive() then return end
 
+    if self.dimensionShiftsRemaining <= 0 then
+        playState:addFloatingText(self.x, self.y - 12, "NO SHIFTS REMAINING! (0/4)", {1, 0.3, 0.3}, self.dimension)
+        return
+    end
+
     local targetDim = (self.dimension == 'overworld') and 'nether' or 'overworld'
     
     if self:collidesWithSolid(self.x, self.y, grid, targetDim) then
@@ -132,6 +138,7 @@ function Hero:shiftDimension(grid, playState)
         return
     end
 
+    self.dimensionShiftsRemaining = self.dimensionShiftsRemaining - 1
     self.dimension = targetDim
     self.shiftCooldown = self.shiftCooldownMax
 
@@ -404,7 +411,7 @@ function Hero:attack(playState)
     if playState.enemyHero and playState.enemyHero:isAlive() and playState.enemyHero.dimension == self.dimension then
         local d = Distance(slashX, slashY, playState.enemyHero.x + 9, playState.enemyHero.y + 9)
         if d <= hitRadius + 9 then
-            playState.enemyHero:takeDamage(currentDmg)
+            playState.enemyHero:takeDamage(currentDmg, playState)
             playState:addFloatingText(playState.enemyHero.x, playState.enemyHero.y - 10, "-" .. math.floor(currentDmg), {1, 0.2, 0.2}, self.dimension)
         end
     end
@@ -423,7 +430,7 @@ function Hero:attack(playState)
         if dCore <= hitRadius + playState.enemyCore.size / 2 then
             local enemyAnchor = playState.grid:getAnchor('nether', 'enemy')
             local dmg = enemyAnchor and math.floor(currentDmg * 0.5) or currentDmg
-            playState.enemyCore:takeDamage(dmg)
+            playState.enemyCore:takeDamage(dmg, self, playState)
             if enemyAnchor then
                 playState:addFloatingText(playState.enemyCore.x, playState.enemyCore.y - 8, "-" .. dmg .. " (Shielded!)", {0.8, 0.5, 1}, 'overworld')
             else
@@ -516,6 +523,20 @@ function Hero:mineOrBuild(grid, playState)
                 playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Healing Chamber Built!", {0.2, 1.0, 0.5}, self.dimension)
             else
                 playState:addFloatingText(self.x, self.y - 12, "Need 50 Coins, 60 Ores, 20 Gems!", {1, 0.4, 0.4}, self.dimension)
+            end
+        elseif self.buildSelection == 'shed' then
+            if not playState.shedUnlocked then
+                playState:addFloatingText(self.x, self.y - 12, "Shed Locked! (Destroy 2 turrets & kill solo hero)", {1, 0.3, 0.3}, self.dimension)
+            elseif self.gold >= 40 and self.stone >= 40 then
+                self.gold = self.gold - 40
+                self.stone = self.stone - 40
+                grid:buildTile(gx, gy, Tile.PET_SHED, self.dimension)
+                gSounds['build']:stop()
+                gSounds['build']:play()
+                playState:addFloatingText((gx - 0.5) * 32, (gy - 0.5) * 32, "Pet Shed Built! Pet Training Started!", {0.4, 0.9, 0.3}, self.dimension)
+                playState:startPetTraining('player')
+            else
+                playState:addFloatingText(self.x, self.y - 12, "Need 40 Coins, 40 Ores!", {1, 0.4, 0.4}, self.dimension)
             end
         end
     end

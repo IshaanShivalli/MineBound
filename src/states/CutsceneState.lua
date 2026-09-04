@@ -78,13 +78,28 @@ function CutsceneState:render()
     love.graphics.rectangle('fill', 0, 0, push:getWidth(), 35)
     love.graphics.rectangle('fill', 0, push:getHeight() - 35, push:getWidth(), 35)
 
-    -- Ambient Floating Particle Dust
+    -- Ambient Floating Particle Dust & Moving Cutscene Actors
     love.graphics.setColor(scene.color[1], scene.color[2], scene.color[3], 0.15 * self.fadeAlpha)
     for i = 1, 25 do
         local px = (math.sin(self.timer * 0.5 + i * 2.3) * 0.5 + 0.5) * push:getWidth()
         local py = (math.cos(self.timer * 0.4 + i * 1.7) * 0.5 + 0.5) * (push:getHeight() - 80) + 40
         love.graphics.circle('fill', px, py, 2)
     end
+
+    -- Moving Cutscene Sprites / Animation
+    local actorX = ((self.timer * 60) % (push:getWidth() + 80)) - 40
+    local actorY = push:getHeight() - 75
+    love.graphics.setColor(1, 1, 1, self.fadeAlpha * 0.95)
+    love.graphics.draw(gTextures['hero'], gFrames['hero'][2], actorX, actorY)
+
+    local minionX = actorX - 45
+    love.graphics.draw(gTextures['minion_player'], gFrames['minion_player'][1], minionX, actorY + 4)
+
+    local portalPulse = (math.sin(self.timer * 5) + 1) * 0.5
+    love.graphics.setColor(0.8, 0.3, 1.0, self.fadeAlpha * (0.3 + portalPulse * 0.3))
+    love.graphics.circle('fill', push:getWidth() - 80, push:getHeight() / 2, 30 + portalPulse * 10)
+    love.graphics.setColor(0.9, 0.6, 1.0, self.fadeAlpha * 0.8)
+    love.graphics.circle('line', push:getWidth() - 80, push:getHeight() / 2, 35 + portalPulse * 10)
 
     -- Scene Content with Fade
     love.graphics.setColor(scene.color[1], scene.color[2], scene.color[3], self.fadeAlpha)

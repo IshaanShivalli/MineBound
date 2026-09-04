@@ -18,7 +18,7 @@ function Core:isDestroyed()
     return self.health <= 0
 end
 
-function Core:takeDamage(amount)
+function Core:takeDamage(amount, attacker, playState)
     if self:isDestroyed() then return end
 
     self.health = math.clamp(self.health - amount, 0, self.maxHealth)
@@ -26,6 +26,33 @@ function Core:takeDamage(amount)
 
     gSounds['core_hit']:stop()
     gSounds['core_hit']:play()
+
+    -- Check if shield structure (Nether Anchor) was just broken/absent
+    local anchor = playState and playState.grid:getAnchor('nether', self.owner)
+    if not anchor then
+        -- Shield destroyed/inactive: base damages player and pets attacking it
+        if attacker and attacker.takeDamage then
+            attacker:takeDamage(15)
+            if playState then
+                playState:addFloatingText(attacker.x, attacker.y - 12, "BASE SHIELD RETALIATION! (-15)", {1, 0.2, 0.2}, attacker.dimension or 'overworld')
+                playState:addSparks(attacker.x, attacker.y, {1, 0.2, 0.2}, attacker.dimension or 'overworld')
+            end
+        end
+
+        -- Retaliate against active attacking pets
+        if playState and playState.pets then
+            for _, pet in ipairs(playState.pets) do
+                local oppOwner = (self.owner == 'player') and 'enemy' or 'player'
+                if pet.owner == oppOwner then
+                    local d = Distance(self.x + self.size / 2, self.y + self.size / 2, pet.x, pet.y)
+                    if d < 120 then
+                        playState:addFloatingText(pet.x, pet.y - 10, "BASE SHIELD RETALIATION!", {1, 0.2, 0.2}, 'overworld')
+                        playState:addSparks(pet.x, pet.y, {1, 0.2, 0.2}, 'overworld')
+                    end
+                end
+            end
+        end
+    end
 end
 
 function Core:update(dt, playState)

@@ -7,6 +7,7 @@ local Boss = require 'src.entities.Boss'
 local Core = require 'src.entities.Core'
 local Minion = require 'src.entities.Minion'
 local EnemyAI = require 'src.entities.EnemyAI'
+local Pet = require 'src.entities.Pet'
 
 PlayState = Class{__includes = BaseState}
 
@@ -23,7 +24,25 @@ function PlayState:init()
     self.enemyHero = EnemyHero(TILE_SIZE * 17, TILE_SIZE * 5)
     self.boss = Boss(TILE_SIZE * 10, TILE_SIZE * 8)
     self.minions = {}
+    self.pets = {}
     self.enemyAI = EnemyAI(self)
+
+    -- Shed Unlock tracking (2 turrets destroyed + solo enemy hero kill)
+    self.turretsDestroyedByPlayer = 0
+    self.soloHeroKillAchieved = false
+    self.shedUnlocked = false
+
+    -- Pet training timer (5 seconds for pet training in shed)
+    self.petTrainingTimer = 0
+    self.petTrainingActive = false
+    self.petOwnerInTraining = nil
+
+    -- War counting & Boss spawn logic (boss spawns in nether after every 2 completed wars)
+    self.completedWarsCount = 0
+    self.bossSpawnWarInterval = 2
+
+    -- Automatically spawn enemy pet so opponents have pets as specified
+    table.insert(self.pets, Pet('enemy', TILE_SIZE * 17, TILE_SIZE * 5))
 
     -- Visual Effects (dimension-tagged)
     self.floatingTexts = {}
@@ -155,9 +174,35 @@ function PlayState:spawnSiegeJuggernaut(owner)
     self:addFloatingText(minion.x, minion.y - 12, "SIEGE JUGGERNAUT SUMMONED!", {1.0, 0.8, 0.2}, 'overworld')
 end
 
+function PlayState:startPetTraining(owner)
+    self.petTrainingActive = true
+    self.petTrainingTimer = 5.0
+    self.petOwnerInTraining = owner or 'player'
+    self:addFloatingText(self.hero.x, self.hero.y - 20, "PET TRAINING STARTED IN SHED! (5s)", {0.4, 0.9, 0.3}, self.hero.dimension)
+end
+
 function PlayState:update(dt)
     if self.gameOver then return end
     self.gameTimer = self.gameTimer + dt
+
+    -- Handle Pet Training completion
+    if self.petTrainingActive then
+        self.petTrainingTimer = self.petTrainingTimer - dt
+        if self.petTrainingTimer <= 0 then
+            self.petTrainingActive = false
+            local pet = Pet(self.petOwnerInTraining, self.hero.x, self.hero.y)
+            table.insert(self.pets, pet)
+            self:addFloatingText(self.hero.x, self.hero.y - 20, "PET TRAINED & READY!", {0.4, 0.9, 0.3}, self.hero.dimension)
+            gSounds['upgrade']:stop()
+            gSounds['upgrade']:play()
+        end
+    end
+
+    -- Update Pets
+    for i = #self.pets, 1, -1 do
+        local pet = self.pets[i]
+        pet:update(dt, self)
+    end
 
     -- Update Visual Effects even when shop is open (so purchase feedback shows)
     for i = #self.floatingTexts, 1, -1 do
@@ -214,6 +259,19 @@ function PlayState:update(dt)
     self.playerCore:update(dt, self)
     self.enemyCore:update(dt, self)
     self.enemyAI:update(dt)
+
+    -- Track completed war waves (every 2 wave cycles count as a war across both worlds)
+    if self.playerCore.spawnTimer == 0 then
+        self.completedWarsCount = self.completedWarsCount + 1
+        if self.completedWarsCount % self.bossSpawnWarInterval == 0 then
+            if not self.boss or not self.boss:isAlive() then
+                self.boss = Boss(TILE_SIZE * 10, TILE_SIZE * 8)
+                self.bossRewardGranted = false
+                self:addFloatingText(push:getWidth() / 2, 40, "VOID GOLEM RESPAWNED IN NETHER REALM!", {0.9, 0.4, 1.0}, 'nether')
+                self:addFloatingText(push:getWidth() / 2, 40, "VOID GOLEM RESPAWNED IN NETHER REALM!", {0.9, 0.4, 1.0}, 'overworld')
+            end
+        end
+    end
 
     -- Check Boss death for Juggernaut spawn
     if self.boss and not self.boss:isAlive() and not self.bossRewardGranted then
@@ -352,6 +410,10 @@ function PlayState:keypressed(key)
     elseif key == '4' then
         self.hero.buildSelection = 'healer'
         self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Healing Chamber (50 Coins, 60 Ores, 20 Gems)", {0.2, 1.0, 0.5}, self.hero.dimension)
+    elseif key == '5' then
+        self.hero.buildSelection = 'shed'
+        local unlockStatus = self.shedUnlocked and "(40 Coins, 40 Ores)" or "[LOCKED: Need 2 Turret Kills & Solo Hero Kill]"
+        self:addFloatingText(self.hero.x, self.hero.y - 12, "Build: Pet Shed " .. unlockStatus, {0.4, 0.9, 0.3}, self.hero.dimension)
     end
 end
 
@@ -412,6 +474,11 @@ function PlayState:render()
         if minion.dimension == curDim then
             minion:render()
         end
+    end
+
+    -- Render Pets
+    for _, pet in ipairs(self.pets) do
+        pet:render(self)
     end
 
     -- Render Boss (in Nether)
@@ -613,40 +680,42 @@ function PlayState:renderHUD()
     love.graphics.setColor(0.9, 0.4, 1.0, 1)
     love.graphics.print(tostring(self.hero.voidEssence), 225, 4)
 
-    -- Current Dimension Badge
+    -- Current Dimension Badge & Shift Count
     love.graphics.setFont(gFonts['small'])
+    local shiftsLeft = self.hero.dimensionShiftsRemaining or 0
     if curDim == 'overworld' then
         love.graphics.setColor(0.2, 0.6, 1.0, 0.9)
-        love.graphics.rectangle('fill', 265, 4, 85, 16, 3, 3)
+        love.graphics.rectangle('fill', 265, 4, 90, 16, 3, 3)
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.printf("[SURFACE]", 265, 7, 85, 'center')
+        love.graphics.printf("[SURFACE] " .. shiftsLeft .. "/4", 265, 7, 90, 'center')
     else
         love.graphics.setColor(0.8, 0.2, 0.9, 0.9)
-        love.graphics.rectangle('fill', 265, 4, 85, 16, 3, 3)
+        love.graphics.rectangle('fill', 265, 4, 90, 16, 3, 3)
         love.graphics.setColor(1, 1, 1, 1)
-        love.graphics.printf("[NETHER]", 265, 7, 85, 'center')
+        love.graphics.printf("[NETHER] " .. shiftsLeft .. "/4", 265, 7, 90, 'center')
     end
 
     -- Abilities Cooldown Badges
     local dashReady = (self.hero.dashCooldown <= 0)
     love.graphics.setColor(dashReady and {0.2, 0.8, 1} or {0.4, 0.4, 0.4})
-    love.graphics.print("[E] Dash " .. (dashReady and "READY" or string.format("%.1fs", self.hero.dashCooldown)), 355, 6)
+    love.graphics.print("[E] Dash " .. (dashReady and "READY" or string.format("%.1fs", self.hero.dashCooldown)), 365, 6)
 
     local ultReady = (self.hero.ultCooldown <= 0)
     love.graphics.setColor(ultReady and {1.0, 0.85, 0.2} or {0.4, 0.4, 0.4})
-    love.graphics.print("[R] Ult " .. (ultReady and "READY" or string.format("%.1fs", self.hero.ultCooldown)), 430, 6)
+    love.graphics.print("[R] Ult " .. (ultReady and "READY" or string.format("%.1fs", self.hero.ultCooldown)), 440, 6)
 
     -- Tech Shop Prompt
     love.graphics.setColor(0.3, 1.0, 0.6, 1)
-    love.graphics.print("[B] Shop", 500, 6)
+    love.graphics.print("[B] Shop", 510, 6)
 
     -- Bottom Controls Hint Bar
     love.graphics.setColor(0.04, 0.06, 0.1, 0.8)
     love.graphics.rectangle('fill', 0, push:getHeight() - 16, push:getWidth(), 16)
     love.graphics.setColor(1, 1, 1, 0.75)
     love.graphics.setFont(gFonts['small'])
-    local shiftPrompt = (self.hero.shiftCooldown <= 0) and 'Q/Shift: [SHIFT REALM]' or 'Q: Cooldown'
-    love.graphics.print('WASD: Move | J: Attack | E: Dash | R: Ult | Space: Mine/Build | ' .. shiftPrompt .. ' | 1-4: Build | B: Shop', 6, push:getHeight() - 13)
+    local shiftPrompt = (self.hero.shiftCooldown <= 0 and shiftsLeft > 0) and ('Q: Shift (' .. shiftsLeft .. '/4)') or 'Q: Locked'
+    local buildModeStr = '1: Wall | 2: Turret | 3: Anchor | 4: Healer | 5: Shed'
+    love.graphics.print('WASD: Move | J: Attack | E: Dash | R: Ult | Space: Mine/Build | ' .. shiftPrompt .. ' | ' .. buildModeStr .. ' | B: Shop', 4, push:getHeight() - 13)
     love.graphics.setColor(1, 1, 1, 1)
 end
 

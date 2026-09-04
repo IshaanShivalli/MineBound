@@ -18,8 +18,9 @@ Tile.RIFT_PORTAL = 12
 Tile.NETHER_ANCHOR_PLAYER = 13
 Tile.NETHER_ANCHOR_ENEMY = 14
 
--- Special Neutral / Sanctuary Structure (15)
+-- Special Neutral / Sanctuary Structure (15 - 16)
 Tile.HEALING_CHAMBER = 15
+Tile.PET_SHED = 16
 
 function Tile:init(gridX, gridY, tileType, dimension)
     self.gridX = gridX
@@ -46,7 +47,7 @@ function Tile:getDefaultHealth()
         return 120
     elseif self.type == Tile.NETHER_ANCHOR_PLAYER or self.type == Tile.NETHER_ANCHOR_ENEMY then
         return 250
-    elseif self.type == Tile.HEALING_CHAMBER then
+    elseif self.type == Tile.HEALING_CHAMBER or self.type == Tile.PET_SHED then
         return 300
     elseif self.type == Tile.RIFT_PORTAL then
         return 99999
@@ -65,7 +66,8 @@ function Tile:isSolid()
            self.type == Tile.VOID_CRYSTAL or
            self.type == Tile.NETHER_ANCHOR_PLAYER or
            self.type == Tile.NETHER_ANCHOR_ENEMY or
-           self.type == Tile.HEALING_CHAMBER
+           self.type == Tile.HEALING_CHAMBER or
+           self.type == Tile.PET_SHED
 end
 
 function Tile:isResource()
@@ -255,6 +257,11 @@ function Tile:render(pixelX, pixelY, tileSize)
             local pulse = (math.sin(love.timer.getTime() * 5) + 1) * 0.5
             love.graphics.setColor(0.2, 1.0, 0.5, 0.2 + pulse * 0.25)
             love.graphics.circle('line', pixelX + tileSize / 2, pixelY + tileSize / 2, 16 + pulse * 4)
+            love.graphics.setColor(1, 1, 1, 1)
+        elseif self.type == Tile.PET_SHED then
+            local pulse = (math.sin(love.timer.getTime() * 4) + 1) * 0.5
+            love.graphics.setColor(0.4, 0.9, 0.3, 0.3 + pulse * 0.2)
+            love.graphics.rectangle('line', pixelX + 2, pixelY + 2, tileSize - 4, tileSize - 4, 3, 3)
             love.graphics.setColor(1, 1, 1, 1)
         end
 
